@@ -298,80 +298,171 @@ print(df)` },
         {
           id: 1,
           type: "coding",
-          question: "简单的学生成绩管理：创建包含学生姓名、科目和成绩的DataFrame，并按科目计算平均分",
-          starterCode: `import pandas as pd
-data = {
-    '姓名': ['张三', '李四', '王五', '张三', '李四', '王五'],
-    '科目': ['数学', '数学', '数学', '语文', '语文', '语文'],
-    '成绩': [85, 92, 78, 90, 88, 82]
+          question: "JSON数据处理：解析JSON字符串，提取学生信息、计算平均分、添加新学生并转回JSON",
+          starterCode: `import json
+
+json_str = '''
+{
+    "students": [
+        {"name": "张三", "age": 20, "score": 85},
+        {"name": "李四", "age": 22, "score": 92},
+        {"name": "王五", "age": 19, "score": 78}
+    ]
 }
-# 在这里编写代码`,
-          solution: `import pandas as pd
-data = {
-    '姓名': ['张三', '李四', '王五', '张三', '李四', '王五'],
-    '科目': ['数学', '数学', '数学', '语文', '语文', '语文'],
-    '成绩': [85, 92, 78, 90, 88, 82]
+'''
+# 1. 解析json_str为Python对象
+# 2. 打印所有学生姓名
+# 3. 计算平均分
+# 4. 添加新学生 赵六(21岁, 88分)
+# 5. 将修改后的数据转回JSON字符串并打印`,
+          solution: `import json
+
+json_str = '''
+{
+    "students": [
+        {"name": "张三", "age": 20, "score": 85},
+        {"name": "李四", "age": 22, "score": 92},
+        {"name": "王五", "age": 19, "score": 78}
+    ]
 }
-df = pd.DataFrame(data)
-print(df)
-print()
-print("按科目平均分：")
-print(df.groupby('科目')['成绩'].mean())`,
-          explanation: "使用Pandas创建DataFrame，通过 groupby() 进行分组聚合计算。",
+'''
+# 1. 解析JSON
+data = json.loads(json_str)
+students = data['students']
+
+# 2. 打印所有学生姓名
+print("学生名单：")
+for s in students:
+    print(f"  - {s['name']}（{s['age']}岁，{s['score']}分）")
+
+# 3. 计算平均分
+scores = [s['score'] for s in students]
+avg_score = sum(scores) / len(scores)
+print(f"\\n平均分：{avg_score:.1f}")
+
+# 4. 添加新学生
+students.append({"name": "赵六", "age": 21, "score": 88})
+print(f"\\n添加赵六后共 {len(students)} 人")
+
+# 5. 转回JSON字符串
+new_json = json.dumps(data, ensure_ascii=False, indent=2)
+print("\\n更新后的JSON：")
+print(new_json)`,
+          explanation: "使用 json.loads() 将JSON字符串解析为Python字典进行操作，修改后用 json.dumps() 转回JSON。ensure_ascii=False 保证中文字符正常显示。",
+          hints: [
+            "json.loads(json_str) 把字符串解析成字典/列表。data['students'] 可以访问学生列表。",
+            "提取分数字段用列表推导 [s['score'] for s in students]，再用 sum()/len() 求平均。",
+            "向列表追加元素用 students.append({...})。json.dumps(data, ensure_ascii=False, indent=2) 生成格式化的中文JSON。"
+          ],
           commonErrors: [
-            { error: "分组语法错误", description: "忘记指定聚合函数如 mean()", solution: "groupby() 后需要调用聚合函数" },
+            { error: "中文乱码", description: "未设置 ensure_ascii=False", solution: "json.dumps时设置 ensure_ascii=False 使中文字符正常输出" },
+            { error: "键名错误", description: "字典键名拼写或大小写错误", solution: "确认键名与原始JSON一致（如 name/age/score）" },
           ]
         },
         {
           id: 2,
           type: "coding",
-          question: "数据筛选：使用Pandas从销售数据中筛选出销售额大于1000且地区为\"华东\"的记录",
-          starterCode: `import pandas as pd
-sales_data = {
-    '产品': ['A', 'B', 'C', 'D', 'E'],
-    '销售额': [1500, 800, 2000, 600, 1200],
-    '地区': ['华东', '华北', '华东', '华南', '华东']
-}
-df = pd.DataFrame(sales_data)
-# 在这里编写筛选逻辑`,
-          solution: `import pandas as pd
-sales_data = {
-    '产品': ['A', 'B', 'C', 'D', 'E'],
-    '销售额': [1500, 800, 2000, 600, 1200],
-    '地区': ['华东', '华北', '华东', '华南', '华东']
-}
-df = pd.DataFrame(sales_data)
-filtered = df[(df['销售额'] > 1000) & (df['地区'] == '华东')]
-print("筛选结果：")
-print(filtered)`,
-          explanation: "Pandas支持使用布尔索引进行数据筛选。多个条件需要用 & (与)连接，每个条件必须用括号包裹。",
+          question: "CSV格式数据处理：手动解析CSV文本（用split），计算平均分、最高分、最低分并打印格式化表格",
+          starterCode: `csv_text = '''name,age,score
+张三,20,85
+李四,22,92
+王五,19,78
+赵六,21,88'''
+# 1. 解析csv_text为列表字典
+# 2. 计算平均分、最高分、最低分
+# 3. 打印格式化表格（表头、分隔线、每行数据）`,
+          solution: `csv_text = '''name,age,score
+张三,20,85
+李四,22,92
+王五,19,78
+赵六,21,88'''
+
+# 1. 解析CSV
+lines = csv_text.strip().split('\\n')
+headers = lines[0].split(',')
+students = []
+for line in lines[1:]:
+    values = line.split(',')
+    row = {
+        'name': values[0],
+        'age': int(values[1]),
+        'score': int(values[2])
+    }
+    students.append(row)
+
+# 2. 计算统计量
+scores = [s['score'] for s in students]
+avg = sum(scores) / len(scores)
+best = max(scores)
+worst = min(scores)
+
+# 3. 打印表格
+print(f"{'姓名':<8}{'年龄':<8}{'分数':<8}")
+print("-" * 24)
+for s in students:
+    print(f"{s['name']:<8}{s['age']:<8}{s['score']:<8}")
+print("-" * 24)
+print(f"平均分：{avg:.1f}，最高分：{best}，最低分：{worst}")`,
+          explanation: "用 split('\\n') 分行，再用 split(',') 分字段。注意需要将字符串类型的数字转成 int 才能做数值运算。",
+          hints: [
+            "lines = csv_text.strip().split('\\n') 先去掉首尾空白再换行。headers = lines[0].split(',') 得到表头。",
+            "从 lines[1:] 开始遍历数据行。每行 split(',') 后，第0个是姓名（字符串），第1个是年龄（需int转换），第2个是分数（需int转换）。",
+            "用字典 row = {'name': values[0], 'age': int(values[1]), 'score': int(values[2])} 组织数据，append 到 students 列表。统计用 sum/max/min 内置函数。打印格式化用 f-string 的 :<8 左对齐。"
+          ],
           commonErrors: [
-            { error: "符号错误", description: "使用了 and 而不是 &", solution: "在Pandas筛选中使用 &" },
-            { error: "缺少括号", description: "没有给每个条件加括号", solution: "每个条件必须用括号包裹" },
+            { error: "类型未转换", description: "直接用字符串做数值运算", solution: "用 int() 或 float() 转换数字字段" },
+            { error: "首行未跳过", description: "把表头也当作数据处理", solution: "从 lines[1:] 开始遍历数据行" },
           ]
         },
         {
           id: 3,
           type: "coding",
-          question: "统计分析：编写代码计算一组数据的总数、总和、平均值、最大值和最小值",
-          starterCode: `import pandas as pd
-numbers = [23, 45, 12, 67, 89, 34, 56, 78, 91, 28]
-df = pd.DataFrame(numbers, columns=['数值'])
-# 在这里编写代码`,
-          solution: `import pandas as pd
-numbers = [23, 45, 12, 67, 89, 34, 56, 78, 91, 28]
-df = pd.DataFrame(numbers, columns=['数值'])
-print(f"总数：{len(numbers)}")
-print(f"总和：{sum(numbers)}")
-print(f"平均值：{sum(numbers)/len(numbers):.2f}")
-print(f"最大值：{max(numbers)}")
-print(f"最小值：{min(numbers)}")
-print()
-print("Pandas describe：")
-print(df.describe())`,
-          explanation: "可以使用Python内置函数进行统计计算，也可以直接使用Pandas的 describe() 方法。",
+          question: "数据类型转换练习：将字符串列表转整数，计算统计信息，生成JSON和字典汇总输出",
+          starterCode: `# 给定混合类型数据
+data = ['100', '200', '300', '400', '500']
+# 1. 转成整数列表并打印
+# 2. 计算总和、平均值
+# 3. 转成JSON字符串打印
+# 4. 创建一个字典，包含 count/sum/avg/min/max 等统计信息`,
+          solution: `import json
+
+# 给定混合类型数据
+data = ['100', '200', '300', '400', '500']
+
+# 1. 转成整数列表
+numbers = [int(s) for s in data]
+print(f"整数列表：{numbers}")
+
+# 2. 计算总和、平均值
+total = sum(numbers)
+avg = total / len(numbers)
+print(f"总和：{total}")
+print(f"平均值：{avg:.1f}")
+
+# 3. 转成JSON字符串
+json_str = json.dumps(numbers)
+print(f"JSON字符串：{json_str}")
+
+# 4. 统计信息字典
+summary = {
+    'count': len(numbers),
+    'sum': total,
+    'avg': avg,
+    'min': min(numbers),
+    'max': max(numbers),
+    'raw': numbers
+}
+print(f"\\n统计汇总（JSON）：")
+print(json.dumps(summary, indent=2, ensure_ascii=False))`,
+          explanation: "列表推导 [int(s) for s in data] 批量转换类型。利用 Python 内置函数 sum/min/max 计算。最终组合成字典并用 json.dumps 格式化输出。",
+          hints: [
+            "int(s) 把字符串 '100' 转成整数 100。批量转换用列表推导写一行搞定。",
+            "sum(numbers)/len(numbers) 计算平均值。注意 Python 3 中整数除法用 / 会得到浮点数。",
+            "构建字典时可以把所有统计量组合在一起。json.dumps(summary, indent=2, ensure_ascii=False) 生成漂亮的 JSON 输出。"
+          ],
           commonErrors: [
-            { error: "空列表处理", description: "没有处理空列表导致除零错误", solution: "判断列表长度或使用Pandas自动处理" },
+            { error: "除零错误", description: "空列表时计算平均值报错", solution: "先判断 len(numbers) > 0 再计算" },
+            { error: "非法字符", description: "字符串包含非数字字符", solution: "实际项目中可用 try-except 捕获 ValueError" },
           ]
         },
       ],
@@ -506,38 +597,54 @@ collect_user_info()`,
         {
           id: 3,
           type: "coding",
-          question: "数据存储与展示：编写一个保存学生成绩到JSON文件并从文件读取展示的程序",
+          question: "模拟文件读写：在内存中模拟保存与读取JSON数据，计算每位学生的平均分并添加新学生",
           starterCode: `import json
-def save_and_load_scores():
+def simulate_file_operations():
+    # 模拟数据
     scores = {
         '张三': {'数学': 85, '语文': 90},
         '李四': {'数学': 92, '语文': 88}
     }
-    # 在这里编写代码
-save_and_load_scores()`,
+    # 1. 模拟保存到"文件"（实际是转成JSON字符串存到变量）
+    # 2. 模拟从"文件"读取（从变量解析回字典），并打印每人的平均分
+    # 3. 添加新学生王五（数学95分，语文80分），再次打印完整数据
+simulate_file_operations()`,
           solution: `import json
-def save_and_load_scores():
+
+def simulate_file_operations():
+    # 模拟数据
     scores = {
         '张三': {'数学': 85, '语文': 90},
         '李四': {'数学': 92, '语文': 88}
     }
-    with open('scores.json', 'w', encoding='utf-8') as f:
-        json.dump(scores, f, ensure_ascii=False, indent=2)
-    print("已保存到 scores.json")
-    with open('scores.json', 'r', encoding='utf-8') as f:
-        loaded = json.load(f)
-    print("\\n从文件读取：")
+
+    # 1. 模拟保存到"文件"（转成JSON字符串存入变量）
+    saved_content = json.dumps(scores, ensure_ascii=False, indent=2)
+    print("模拟保存到文件，内容：")
+    print(saved_content)
+
+    # 2. 模拟从"文件"读取（从变量解析回字典）
+    print("\\n模拟从文件读取，计算每位学生的平均分：")
+    loaded = json.loads(saved_content)
     for name, subjects in loaded.items():
-        print(f"{name}: {subjects}")
-save_and_load_scores()`,
-          explanation: "使用 json.dump() 将字典保存为JSON文件，json.load() 从文件读取数据。with 语句自动管理文件的打开和关闭。",
+        avg_score = sum(subjects.values()) / len(subjects)
+        print(f"  {name}: {subjects}，平均 {avg_score:.1f} 分")
+
+    # 3. 添加新学生王五，并重新输出完整数据
+    scores['王五'] = {'数学': 95, '语文': 80}
+    print(f"\\n添加王五后，完整数据：")
+    print(json.dumps(scores, ensure_ascii=False, indent=2))
+
+simulate_file_operations()`,
+          explanation: "浏览器环境（Pyodide）没有可写入的本地文件系统，所以用变量保存JSON字符串来模拟文件读写。核心是 json.dumps 序列化和 json.loads 反序列化，理解数据在字符串和对象之间的转换过程。",
           hints: [
-            "用 with open('scores.json', 'w', encoding='utf-8') as f: 打开文件用于写入。在 with 块内调用 json.dump(scores, f, ensure_ascii=False, indent=2) 保存数据。",
-            "ensure_ascii=False 让中文字符正常显示，indent=2 让JSON文件格式美观有缩进。写入后打印提示信息。",
-            "读取时用 with open('scores.json', 'r', encoding='utf-8') as f: 配合 loaded = json.load(f) 获取数据。用 for name, subjects in loaded.items(): 遍历并打印每个学生的成绩。"
+            "模拟保存：用 json.dumps(scores, ensure_ascii=False, indent=2) 得到一个格式美观的JSON字符串，把它存在一个变量（如 saved_content）中，就好比写入了文件。",
+            "模拟读取：用 json.loads(saved_content) 把字符串解析回字典，就好比从文件读出。遍历字典计算每人平均分：sum(subjects.values()) / len(subjects)。",
+            "添加新学生：直接 scores['王五'] = {'数学': 95, '语文': 80}。再用 json.dumps 格式化输出完整数据。"
           ],
           commonErrors: [
-            { error: "中文乱码", description: "未设置 encoding 和 ensure_ascii 参数", solution: "设置 encoding=utf-8 和 ensure_ascii=False" },
+            { error: "使用真实文件I/O", description: "使用了 open()/json.dump()/json.load() 读写文件", solution: "在浏览器环境中改用 json.dumps/json.loads 操作字符串，或仅使用内存中的变量" },
+            { error: "中文乱码", description: "未设置 ensure_ascii=False", solution: "json.dumps 时设置 ensure_ascii=False 使中文字符正常显示" },
           ]
         },
       ],
@@ -986,123 +1093,181 @@ else:
         {
           id: 1,
           type: "coding",
-          question: "猜数字2.0电脑猜：编写让电脑自动猜测数字的程序，用二分法优化效率",
-          starterCode: `import random
-def computer_guess():
-    # 在这里编写代码
-computer_guess()`,
-          solution: `import random
-def computer_guess():
-    print("请在心中想一个1-1000之间的数字")
-    low = 1
-    high = 1000
-    attempts = 0
-    while low <= high:
-        guess = (low + high) // 2
-        attempts += 1
-        print(f"\\n电脑猜测第{attempts}次：{guess}")
-        feedback = input("请回答(>/</=)：").strip()
-        if feedback == '=':
-            print(f"电脑用{attempts}次猜中了你的数字！")
-            break
-        elif feedback == '>':
-            high = guess - 1
-        elif feedback == '<':
-            low = guess + 1
-        else:
-            print("请输入有效的符号")
-            continue
-    print(f"共尝试 {attempts} 次")
-computer_guess()`,
-          explanation: "二分法每次将搜索范围缩小一半，时间复杂度为 O(log n)。在1-1000范围内，最多只需10次猜测。",
+          question: "描述性统计：生成随机数据，计算平均值、中位数、标准差、最大值、最小值并打印",
+          starterCode: `import statistics
+import random
+
+random.seed(42)
+data = [random.gauss(50, 10) for _ in range(100)]
+# 1. 计算平均值
+# 2. 计算中位数
+# 3. 计算标准差
+# 4. 计算最大值和最小值
+# 5. 用表格形式打印所有统计量`,
+          solution: `import statistics
+import random
+
+random.seed(42)
+data = [random.gauss(50, 10) for _ in range(100)]
+
+mean_val = statistics.mean(data)
+median_val = statistics.median(data)
+stdev_val = statistics.stdev(data)
+min_val = min(data)
+max_val = max(data)
+
+print("=" * 30)
+print("     描述性统计结果")
+print("=" * 30)
+print(f"  数据个数 : {len(data)}")
+print(f"  平均值   : {mean_val:.2f}")
+print(f"  中位数   : {median_val:.2f}")
+print(f"  标准差   : {stdev_val:.2f}")
+print(f"  最小值   : {min_val:.2f}")
+print(f"  最大值   : {max_val:.2f}")
+print(f"  极差     : {max_val - min_val:.2f}")
+print("=" * 30)
+print(f"  期望平均值约为 50，标准差约为 10")
+print(f"  （正态分布中约 68% 数据在 均值±1σ 范围内）")`,
+          explanation: "statistics 是 Python 标准库，提供 mean/median/stdev 等基础统计函数。random.gauss(mu, sigma) 生成服从正态分布的随机数。随机种子固定后结果可复现。",
           hints: [
-            "初始化 low = 1, high = 1000，每次猜测 guess = (low + high) // 2 取中间值。根据用户反馈调整搜索范围。",
-            "如果用户输入 '>'（表示答案比 guess 大，即猜小了），则 low = guess + 1；如果输入 '<'，则 high = guess - 1；输入 '=' 表示猜中。",
-            "用 attempts 变量记录猜测次数。注意输入非预期符号时提示用户重输，用 continue 跳过本轮循环。循环条件 while low <= high 防止无限循环。"
+            "statistics.mean(data) 计算平均值，statistics.median(data) 计算中位数（排序后中间位置的值）。",
+            "statistics.stdev(data) 计算样本标准差（分母为 n-1），而 statistics.pstdev 是总体标准差（分母 n）。默认用 stdev 更常见。",
+            "min(data) 和 max(data) 是 Python 内置函数。极差 = max - min。用 print(f\"...\") 配合转义字符让输出像表格，加一些 ===== 分隔线。"
           ],
           commonErrors: [
-            { error: "边界更新错误", description: "更新 low/high 时忘记加减1导致死循环", solution: "太大时 high=guess-1，太小时 low=guess+1" },
+            { error: "样本 vs 总体", description: "混淆样本标准差与总体标准差", solution: "stdev 用 n-1（样本），pstdev 用 n（总体），通常用 stdev" },
+            { error: "未固定种子", description: "结果不可复现", solution: "用 random.seed(42) 固定随机种子使运行结果一致" },
           ]
         },
         {
           id: 2,
           type: "coding",
-          question: "简单的统计计算：编写代码生成数据并计算偏度和峰度，理解数据分布特征",
-          starterCode: `import numpy as np
-from scipy import stats
-def distribution_analysis():
-    # 在这里编写代码
-distribution_analysis()`,
-          solution: `import numpy as np
-from scipy import stats
-def distribution_analysis():
-    np.random.seed(42)
-    normal_data = np.random.normal(50, 10, 1000)
-    skewed_data = np.random.exponential(20, 1000) + 20
-    uniform_data = np.random.uniform(20, 80, 1000)
-    datasets = {'正态分布': normal_data, '右偏分布': skewed_data, '均匀分布': uniform_data}
-    print("=== 分布特征分析 ===")
-    for name, data in datasets.items():
-        mean = np.mean(data)
-        median = np.median(data)
-        std = np.std(data)
-        skewness = stats.skew(data)
-        kurtosis = stats.kurtosis(data)
-        print(f"{name}: 均值={mean:.1f}, 中位数={median:.1f}, 标准差={std:.1f}, 偏度={skewness:.2f}, 峰度={kurtosis:.2f}")
-distribution_analysis()`,
-          explanation: "偏度衡量分布的对称性，峰度衡量分布的陡峭程度。结合均值和中位数关系可以判断分布形状。",
+          question: "相关性分析：计算两个列表 x 和 y 的均值、协方差和 Pearson 相关系数（手动实现，不依赖外部库）",
+          starterCode: `import math
+import statistics
+
+# 两个列表 x 和 y
+x = [10, 20, 30, 40, 50]
+y = [15, 25, 35, 45, 55]
+# 1. 计算 x 和 y 的均值
+# 2. 计算协方差 covariance = sum((xi - mean_x)*(yi - mean_y)) / (n-1)
+# 3. 计算 Pearson 相关系数 = 协方差 / (stdev_x * stdev_y)
+# 4. 打印所有中间量和最终结果`,
+          solution: `import math
+import statistics
+
+x = [10, 20, 30, 40, 50]
+y = [15, 25, 35, 45, 55]
+n = len(x)
+
+# 1. 计算均值
+mean_x = statistics.mean(x)
+mean_y = statistics.mean(y)
+print(f"x 的均值 = {mean_x:.2f}")
+print(f"y 的均值 = {mean_y:.2f}")
+
+# 2. 计算协方差（样本协方差，除以 n-1）
+cov = sum((xi - mean_x) * (yi - mean_y) for xi, yi in zip(x, y)) / (n - 1)
+print(f"协方差   = {cov:.2f}")
+
+# 3. 计算 Pearson 相关系数
+stdev_x = statistics.stdev(x)
+stdev_y = statistics.stdev(y)
+pearson = cov / (stdev_x * stdev_y)
+print(f"x 的标准差 = {stdev_x:.2f}")
+print(f"y 的标准差 = {stdev_y:.2f}")
+print(f"Pearson 相关系数 = {pearson:.4f}")
+
+# 4. 解读结果
+if pearson > 0.9:
+    verdict = "极强正相关"
+elif pearson > 0.7:
+    verdict = "强正相关"
+elif pearson > 0.3:
+    verdict = "中等相关"
+elif pearson > -0.3:
+    verdict = "弱相关或无相关"
+elif pearson > -0.7:
+    verdict = "中等负相关"
+else:
+    verdict = "强负相关"
+print(f"\\n结论：{verdict}（r = {pearson:.4f}）")`,
+          explanation: "协方差衡量两个变量的变化方向是否一致，Pearson 相关系数将其归一化到 [-1, 1]，便于解读。完全线性相关时 |r| = 1。用 Python 标准库的 math 和 statistics 手动实现，不依赖 scipy。",
           hints: [
-            "用 np.random.seed(42) 设置随机种子。生成3种不同分布的数据：normal() 正态分布、exponential() 指数分布（右偏）、uniform() 均匀分布。",
-            "把3个数据集放到一个字典 datasets 中，键是中文名，值是数据数组。然后用 for name, data in datasets.items(): 循环遍历逐个计算。",
-            "每数据集计算：np.mean(data) 均值、np.median(data) 中位数、np.std(data) 标准差、stats.skew(data) 偏度、stats.kurtosis(data) 峰度。用 f-string 统一格式化输出。"
+            "均值用 statistics.mean()。协方差公式：每个 xi 与 x 均值的偏差 × 对应 yi 与 y 均值的偏差，求和后除以 n-1（样本协方差）。",
+            "for xi, yi in zip(x, y) 可以同时遍历两个列表。这是 Python 中并行遍历多列表的标准写法。",
+            "Pearson r = 协方差 / (x的标准差 × y的标准差)。stdev_x * stdev_y 在分母，确保结果被归一化到 [-1, 1] 区间。"
           ],
           commonErrors: [
-            { error: "样本与总体混淆", description: "未注意某些库默认计算的是样本统计量", solution: "注意查看文档是否需要调整参数（如 ddof）" },
+            { error: "协方差分母", description: "用 n 而非 n-1", solution: "样本协方差除以 n-1，总体协方差除以 n，通常用 n-1" },
+            { error: "因果误判", description: "把高相关当作因果", solution: "相关 ≠ 因果，只能说明变化趋势一致" },
           ]
         },
         {
           id: 3,
           type: "coding",
-          question: "数据分析练习：编写代码计算两组数据的相关系数并进行线性回归拟合",
-          starterCode: `import numpy as np
-from scipy import stats
-import matplotlib.pyplot as plt
-def regression_analysis():
-    # 在这里编写代码
-regression_analysis()`,
-          solution: `import numpy as np
-from scipy import stats
-import matplotlib.pyplot as plt
-def regression_analysis():
-    hours = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
-    scores = np.array([45, 55, 60, 68, 75, 82, 88, 92, 95, 98])
-    corr, _ = stats.pearsonr(hours, scores)
-    print(f"Pearson相关系数: {corr:.4f}")
-    slope, intercept, r_value, p_val, std_err = stats.linregress(hours, scores)
-    print(f"回归方程: 分数 = {slope:.2f} x 时长 + {intercept:.2f}")
-    print(f"R^2: {r_value**2:.4f}")
-    for h in [3.5, 7.5]:
-        pred = slope * h + intercept
-        print(f"学习{h}小时，预测得分: {pred:.1f}分")
-    plt.figure(figsize=(10, 6))
-    plt.scatter(hours, scores, color='blue', s=100, label='实际数据')
-    x_line = np.linspace(min(hours), max(hours), 100)
-    plt.plot(x_line, slope * x_line + intercept, 'r-', linewidth=2, label='回归线')
-    plt.xlabel('学习时长（小时）', fontsize=12)
-    plt.ylabel('考试分数', fontsize=12)
-    plt.title('学习时长与分数关系（线性回归）', fontsize=14)
-    plt.legend()
-    plt.grid(True, alpha=0.3)
-    plt.show()
-regression_analysis()`,
-          explanation: "使用 scipy.stats.linregress() 进行最小二乘线性回归，得到斜率、截距和R^2。R^2越接近1，模型拟合越好。",
+          question: "频率分布表：生成随机分数数据，按区间分组统计人数，打印频率分布表并用星号（*）绘制直方图",
+          starterCode: `import random
+from collections import Counter
+
+random.seed(123)
+scores = [random.randint(50, 100) for _ in range(200)]
+# 1. 将分数按区间分组：50-59, 60-69, 70-79, 80-89, 90-100
+# 2. 统计每个区间的人数
+# 3. 打印格式：区间 | 人数 | 星号直方图（每个*代表2人）`,
+          solution: `import random
+from collections import Counter
+
+random.seed(123)
+scores = [random.randint(50, 100) for _ in range(200)]
+
+# 1. 定义区间，并将每个分数分配到对应区间
+bins = [
+    ('50-59 ', lambda s: 50 <= s <= 59),
+    ('60-69 ', lambda s: 60 <= s <= 69),
+    ('70-79 ', lambda s: 70 <= s <= 79),
+    ('80-89 ', lambda s: 80 <= s <= 89),
+    ('90-100', lambda s: 90 <= s <= 100),
+]
+
+# 2. 统计每个区间的人数
+counts = {}
+for label, condition in bins:
+    counts[label] = sum(1 for s in scores if condition(s))
+
+# 额外统计：计算平均分
+avg = sum(scores) / len(scores)
+
+# 3. 打印频率分布表 + 星号直方图
+print("=" * 50)
+print(f"         分数频率分布表（共 {len(scores)} 人）")
+print("=" * 50)
+print(f"  区间   |  人数  |  分布")
+print("-" * 50)
+
+max_count = max(counts.values())
+for label, count in counts.items():
+    # 每个 * 代表 2 人（让图表不会太长）
+    bar = '*' * (count // 2)
+    pct = count / len(scores) * 100
+    print(f"  {label} |  {count:>4}  |  {bar} ({pct:.1f}%)")
+
+print("-" * 50)
+print(f"  平均分 : {avg:.1f}")
+print(f"  最高分 : {max(scores)}")
+print(f"  最低分 : {min(scores)}")
+print(f"  众数区间: {max(counts, key=counts.get)}")
+print("=" * 50)`,
+          explanation: "用 lambda 表达式定义每个区间的筛选条件，遍历分数列表统计各区间人数。通过字符串拼接 '*' 字符绘制简易直方图，可以直观看到数据分布形态。Counter 也可以用于更细粒度的统计。",
           hints: [
-            "先用 np.array() 把学习时长和分数转换成NumPy数组。stats.pearsonr(hours, scores) 计算Pearson相关系数，返回 (相关系数, p值)。",
-            "stats.linregress() 返回5个值：slope 斜率、intercept 截距、r_value 相关系数、p_val p值、std_err 标准误。R^2 = r_value 的平方。",
-            "预测：用 y = slope * x + intercept 公式。绘图：plt.scatter() 画实际数据点，plt.plot() 用 np.linspace() 生成100个平滑点画回归线。别忘了用 label 参数配合 plt.legend() 显示图例。"
+            "bins 用列表存储 (标签, 判断函数) 对，lambda s: 50 <= s <= 59 是判断分数是否落在某个区间的匿名函数。",
+            "sum(1 for s in scores if condition(s)) 是统计符合条件分数数量的简洁写法，等价于 for 循环 + 计数累加。",
+            "画星号：每个 '*' 代表 2 人，所以用 count // 2。'*' * n 会生成 n 个星号的字符串。格式上用 :>4 让数字右对齐，使表格更整齐。"
           ],
           commonErrors: [
-            { error: "因果误解", description: "把相关性误判为因果关系", solution: "相关不代表因果，需谨慎解读回归结果" },
+            { error: "区间边界重叠", description: "如 60 同时算入 50-60 和 60-70", solution: "用左闭右闭 [50-59][60-69] 或左闭右开但要统一规则，本练习用 [50-59][60-69]... 的整数区间，无重叠" },
+            { error: "字典遍历顺序", description: "Python 3.7+ 字典保持插入顺序，但不要假设老版本也如此", solution: "显式按 bins 列表顺序遍历，而非 counts 字典顺序" },
           ]
         },
       ],

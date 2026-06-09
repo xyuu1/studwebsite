@@ -16,6 +16,13 @@ interface ExerciseAnswerState {
   hints: string[];
 }
 
+interface PyodideResult {
+  text: string;
+  image?: string;
+  steps?: number;
+  time?: number;
+}
+
 export default function CourseDetail() {
   const { courseId } = useParams();
   const course = courses.find(c => c.id === parseInt(courseId!));
@@ -27,6 +34,7 @@ export default function CourseDetail() {
   const [exerciseAnswers, setExerciseAnswers] = useState<Record<number, ExerciseAnswerState>>({});
   const [exerciseCode, setExerciseCode] = useState<Record<number, string>>({});
   const [exerciseOutput, setExerciseOutput] = useState<Record<number, string>>({});
+  const [exerciseImages, setExerciseImages] = useState<Record<number, string>>({});
   const [runningExercise, setRunningExercise] = useState<number | null>(null);
 
   // 提示状态（编程题 + 选择题 + 判断题共用）
@@ -402,6 +410,7 @@ export default function CourseDetail() {
     setExerciseAnswers({});
     setExerciseCode({});
     setExerciseOutput({});
+    setExerciseImages({});
     resetHintsByPrefix('exercise');
   };
 
@@ -439,6 +448,7 @@ export default function CourseDetail() {
       setExerciseAnswers({});
       setExerciseCode({});
       setExerciseOutput({});
+      setExerciseImages({});
       setMcAnswers({});
       setMcResults({});
       setTfAnswers({});
@@ -509,14 +519,14 @@ export default function CourseDetail() {
       codeB64 = btoa(code);
     }
 
-    // ============ 策略 1：Pyodide（首选，带步数/超时限制） ============
+    // ============ 策略 1：Pyodide（首选，带步数/超时限制 + matplotlib 支持） ============
     try {
       const pyodide = await loadPyodide();
 
       // 关键改进：通过 sys.settrace + time.time() 在 Python 层面限制步数与时间
       // 默认最多执行 50000 条字节码 / 最长 10 秒，避免卡死浏览器
       const runScript = `
-import sys, io, base64, time
+import sys, io, base64, time, js
 
 __code_b64 = "${codeB64}"
 __max_steps = 50000
@@ -524,17 +534,19 @@ __max_time = 10.0  # 秒
 __step_count = 0
 __start_time = time.time()
 
-# 捕获 stdout
-__old = sys.stdout
+# 捕获 stdout/stderr
 __buf = io.StringIO()
 sys.stdout = __buf
+sys.stderr = __buf
 
 # 安全 input()：使用浏览器的 prompt 获取用户输入
 def __safe_input(prompt=''):
-    import js
     if prompt:
         print(prompt, end='', flush=True)
+    # 临时恢复 stdout 让 prompt 文字正常显示
+    sys.stdout = sys.__stdout__
     result = js.window.prompt(prompt)
+    sys.stdout = __buf
     if result is None:
         return ''
     return str(result)
@@ -550,10 +562,10 @@ def __trace(frame, event, arg):
     global __step_count
     __step_count += 1
     if __step_count > __max_steps:
-        sys.stdout = __old
+        sys.stdout = sys.__stdout__
         raise RuntimeError("⚠️ 代码执行步数超过限制 (50000步)，可能存在死循环。程序已自动中断。")
     if time.time() - __start_time > __max_time:
-        sys.stdout = __old
+        sys.stdout = sys.__stdout__
         raise RuntimeError("⚠️ 代码执行时间超过 10 秒，已自动中断。")
     return __trace
 
@@ -571,14 +583,31 @@ except Exception as __e:
     traceback.print_exc()
 finally:
     sys.settrace(None)
-    sys.stdout = __old
 
+# 尝试捕获 matplotlib 图像
+__image_b64 = ''
+try:
+    import matplotlib.pyplot as plt
+    __fig = plt.gcf()
+    # 检查是否有实际绘制的内容（有 axes 且至少有内容）
+    if __fig.axes and any(len(ax.get_children()) > 2 for ax in __fig.axes):
+        __img_buf = io.BytesIO()
+        plt.savefig(__img_buf, format='png', dpi=100, bbox_inches='tight')
+        __img_buf.seek(0)
+        __image_b64 = base64.b64encode(__img_buf.read()).decode('utf-8')
+        plt.close('all')
+except:
+    pass
+
+sys.stdout = sys.__stdout__
 __txt = __buf.getvalue()
 if not __txt.strip():
     __txt = '(代码运行成功，没有输出内容)\\n共执行 ' + str(__step_count) + ' 步，用时 ' + str(round(time.time() - __start_time, 3)) + ' 秒'
 else:
     __txt = __txt + '\\n\\n[系统提示] 共执行 ' + str(__step_count) + ' 步，用时 ' + str(round(time.time() - __start_time, 3)) + ' 秒'
-__txt
+
+# 返回字典对象（Pyodide 会自动转换为 JS 对象）
+{'text': __txt, 'image': __image_b64, 'steps': __step_count, 'time': round(time.time() - __start_time, 3)}
 `;
 
       try {
@@ -595,9 +624,31 @@ __txt
           setTimeout(() => reject(new Error('⚠️ JS层超时(15秒)，执行被强制中断。可能存在死循环或复杂计算。')), timeoutMs);
         });
 
-        const result: string = await Promise.race([runPromise, timeoutPromise]) as string;
-        const finalOutput = result || fallbackOutput || '(代码运行成功，没有输出内容)';
+        const result = await Promise.race([runPromise, timeoutPromise]) as any;
+
+        // 解析结果：可能是 dict 对象（Pyodide 返回的 ProxyMap/dict），也可能是 string
+        let textOutput = '';
+        let imageB64 = '';
+
+        if (result && typeof result === 'object' && 'text' in result) {
+          // 从 dict 中提取 text 和 image
+          textOutput = String(result.text || '');
+          imageB64 = String(result.image || '');
+        } else if (typeof result === 'string') {
+          textOutput = result;
+        }
+
+        const finalOutput = textOutput || fallbackOutput || '(代码运行成功，没有输出内容)';
         setExerciseOutput(prev => ({ ...prev, [exerciseId]: finalOutput }));
+        if (imageB64) {
+          setExerciseImages(prev => ({ ...prev, [exerciseId]: imageB64 }));
+        } else {
+          setExerciseImages(prev => {
+            const next = { ...prev };
+            delete next[exerciseId];
+            return next;
+          });
+        }
         setRunningExercise(null);
         return;
       } catch (err: any) {
@@ -635,6 +686,11 @@ __txt
   const handleResetCode = (exerciseId: number, starterCode: string) => {
     setExerciseCode(prev => ({ ...prev, [exerciseId]: starterCode || '' }));
     setExerciseOutput(prev => ({ ...prev, [exerciseId]: '' }));
+    setExerciseImages(prev => {
+      const next = { ...prev };
+      delete next[exerciseId];
+      return next;
+    });
   };
 
   // ============ 完成章节 ============
@@ -744,6 +800,7 @@ __txt
               const hints = generateExerciseHints(exercise);
               const currentCode = exerciseCode[exercise.id] ?? (exercise as any).starterCode ?? '';
               const output = exerciseOutput[exercise.id];
+              const image = exerciseImages[exercise.id];
               const isRunning = runningExercise === exercise.id;
 
               return (
@@ -812,22 +869,41 @@ for i in range(5):
                     </div>
 
                     {/* 运行输出区 */}
-                    {output && (
+                    {(output || image) && (
                       <div className="mt-4 border border-gray-700 rounded-lg overflow-hidden">
                         <div className="flex items-center justify-between bg-gray-800/60 px-4 py-2 border-b border-gray-700">
                           <div className="text-cyan-300 font-medium text-sm flex items-center gap-2">
                             <Terminal className="w-4 h-4" /> 运行输出
                           </div>
                           <button
-                            onClick={() => setExerciseOutput(prev => ({ ...prev, [exercise.id]: '' }))}
+                            onClick={() => {
+                              setExerciseOutput(prev => ({ ...prev, [exercise.id]: '' }));
+                              setExerciseImages(prev => {
+                                const next = { ...prev };
+                                delete next[exercise.id];
+                                return next;
+                              });
+                            }}
                             className="text-gray-400 hover:text-white transition-colors text-xs flex items-center gap-1"
                           >
                             <X className="w-3 h-3" /> 清空
                           </button>
                         </div>
-                        <pre className="p-4 bg-black text-gray-300 font-mono text-sm whitespace-pre-wrap break-words max-h-64 overflow-y-auto">
-                          {output}
-                        </pre>
+                        {image && (
+                          <div className="p-4 bg-gray-900/60 border-b border-gray-700 flex justify-center">
+                            <img
+                              src={`data:image/png;base64,${image}`}
+                              alt="matplotlib 输出"
+                              className="max-w-full h-auto rounded"
+                              style={{ maxHeight: '400px' }}
+                            />
+                          </div>
+                        )}
+                        {output && (
+                          <pre className="p-4 bg-black text-gray-300 font-mono text-sm whitespace-pre-wrap break-words max-h-64 overflow-y-auto">
+                            {output}
+                          </pre>
+                        )}
                       </div>
                     )}
                   </div>
