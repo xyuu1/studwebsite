@@ -80,30 +80,95 @@ print(f"统计数据：{calculate_stats(nums)}")` },
         {
           id: 1,
           type: "coding",
-          question: "猜数字游戏：编写一个函数，让用户猜1-100之间的随机数，给出\"太大了\"或\"太小了\"的提示",
+          question: "猜数字游戏：编写一个函数，支持两种模式：1)玩家猜系统想的数字；2)系统猜玩家想的数字（角色互换）",
           starterCode: `import random
+
 def guess_number():
+    """玩家猜，系统想"""
     target = random.randint(1, 100)
     attempts = 0
     # 在这里编写代码
-guess_number()`,
+
+def computer_guess():
+    """系统猜，玩家想（使用二分法）"""
+    # 在这里编写代码
+
+# 主菜单
+while True:
+    print("\\n===== 猜数字游戏 =====")
+    print("1. 我猜你想")
+    print("2. 你猜我想")
+    print("3. 退出")
+    choice = input("请选择模式 (1/2/3): ")
+    if choice == '1':
+        guess_number()
+    elif choice == '2':
+        computer_guess()
+    elif choice == '3':
+        print("再见！")
+        break`,
           solution: `import random
+
 def guess_number():
+    """猜数字游戏 - 玩家猜，系统想"""
     target = random.randint(1, 100)
     attempts = 0
-    print("欢迎来到猜数字游戏！")
+    print("🎮 欢迎来到猜数字游戏！")
+    print("我已经想好了一个1到100之间的数字。")
     while True:
         try:
             guess = int(input("请输入你的猜测: "))
             attempts += 1
-            if guess < target: print("太小了！再试一次。")
-            elif guess > target: print("太大了！再试一次。")
+            if guess < target:
+                print("⬆️ 太小了！再试一次。")
+            elif guess > target:
+                print("⬇️ 太大了！再试一次。")
             else:
-                print(f"恭喜你，猜对了！用了{attempts}次。")
+                print(f"🎉 恭喜你，猜对了！用了 {attempts} 次尝试。")
                 break
-        except ValueError: print("请输入有效的数字！")
-guess_number()`,
-          explanation: "使用 random.randint() 生成随机数，用 while 循环让用户持续猜测，根据猜测结果给出提示。try-except 处理非法输入。",
+        except ValueError:
+            print("❌ 请输入有效的数字！")
+
+def computer_guess():
+    """猜数字游戏 - 系统猜，玩家想"""
+    print("🔄 角色互换！你想一个1-100之间的数字，我来猜。")
+    input("想好了吗？按回车开始...")
+    low, high = 1, 100
+    attempts = 0
+    while True:
+        attempts += 1
+        guess = (low + high) // 2  # 二分法
+        response = input(f"我猜是 {guess}，太大(T)、太小(S)、还是猜对了(Y)？").strip().upper()
+        
+        if response == 'Y':
+            print(f"🎉 我猜对了！用了 {attempts} 次尝试。")
+            break
+        elif response == 'T':
+            high = guess - 1
+        elif response == 'S':
+            low = guess + 1
+        else:
+            print("❌ 请输入 T(太大)、S(太小) 或 Y(猜对)")
+            attempts -= 1
+
+# 主菜单
+while True:
+    print("\\n===== 猜数字游戏 =====")
+    print("1. 我猜你想")
+    print("2. 你猜我想")
+    print("3. 退出")
+    choice = input("请选择模式 (1/2/3): ")
+    
+    if choice == '1':
+        guess_number()
+    elif choice == '2':
+        computer_guess()
+    elif choice == '3':
+        print("👋 再见！")
+        break
+    else:
+        print("❌ 请输入 1、2 或 3")`,
+          explanation: "使用 random.randint() 生成随机数，用 while 循环让用户持续猜测。第二个函数使用二分法让电脑猜测，玩家给出提示。主菜单支持模式选择。",
           hints: [
             "需要使用 while True 无限循环，让用户可以反复猜，直到猜对。循环内用 input() 获取用户输入，用 int() 转成整数。",
             "核心逻辑：用 if/elif/else 判断 guess 与 target 的大小关系，分别输出 太小了/太大了/猜对了。猜对后用 break 跳出循环。",

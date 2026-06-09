@@ -529,11 +529,15 @@ __old = sys.stdout
 __buf = io.StringIO()
 sys.stdout = __buf
 
-# 安全 input()：不阻塞，直接返回空串
+# 安全 input()：使用浏览器的 prompt 获取用户输入
 def __safe_input(prompt=''):
+    import js
     if prompt:
         print(prompt, end='', flush=True)
-    return ''
+    result = js.window.prompt(prompt)
+    if result is None:
+        return ''
+    return str(result)
 
 try:
     import builtins
