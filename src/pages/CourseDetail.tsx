@@ -62,64 +62,251 @@ export default function CourseDetail() {
     };
   }, []);
 
-  // ============ 动态加载 Pyodide ============
+  // ============ 页面加载时预加载 Pyodide ============
+  useEffect(() => {
+    if (!(window as any).loadPyodide && !document.getElementById('pyodide-script-tag')) {
+      const script = document.createElement('script');
+      script.id = 'pyodide-script-tag';
+      script.src = 'https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js';
+      script.async = true;
+      script.onload = () => {
+        // 脚本已加载到 window，懒加载实际实例（点击运行时再初始化，节省内存）
+      };
+      document.head.appendChild(script);
+    }
+  }, []);
+
   const loadPyodide = (): Promise<any> => {
     return new Promise((resolve, reject) => {
-      // 如果已有实例
       if (pyodideRef.current) {
         resolve(pyodideRef.current);
         return;
       }
-      // 如果已经在加载
       if (pyodideLoadingRef.current) {
-        // 等待 100ms 再检查
+        const tries = { count: 0 };
         const checkInterval = setInterval(() => {
+          tries.count++;
           if (pyodideRef.current) {
             clearInterval(checkInterval);
             resolve(pyodideRef.current);
+          } else if (tries.count > 600) {
+            clearInterval(checkInterval);
+            reject(new Error('加载超时（60秒）'));
           }
         }, 100);
-        // 30秒超时
-        setTimeout(() => {
-          clearInterval(checkInterval);
-          if (!pyodideRef.current) reject(new Error('加载超时'));
-        }, 30000);
         return;
       }
-
+      if (!(window as any).loadPyodide) {
+        reject(new Error('Pyodide 脚本还未加载完成，请稍后再试或刷新页面'));
+        return;
+      }
       pyodideLoadingRef.current = true;
+      (window as any).loadPyodide({ indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.26.2/full/' })
+        .then((py: any) => {
+          pyodideRef.current = py;
+          setPyodideReady(true);
+          // 预加载 sys/io 以便后续重写 stdout
+          try { py.runPythonSync('import sys, io'); } catch (e) {}
+          resolve(py);
+        })
+        .catch((err: any) => {
+          pyodideLoadingRef.current = false;
+          reject(err);
+        });
+    });
+  };
 
-      // 检查是否已在 window 上
-      if ((window as any).loadPyodide) {
-        (window as any).loadPyodide({ indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.26.2/full/' })
-          .then((py: any) => {
-            pyodideRef.current = py;
-            setPyodideReady(true);
-            resolve(py);
-          })
-          .catch(reject);
-        return;
+  // ============ 内置 JavaScript 简易 Python 解释器（备用） ============
+  // 支持: print / 基本运算 / 变量 / if / for range / while / list / dict / len
+  // / str / int / float / range / input (直接返回空字符串避免阻塞)
+  const runPythonJS = (code: string): string => {
+    const output: string[] = [];
+    try {
+      // 最小化的 Python → JS 转译：逐行 / 按块处理
+      // 1) 处理 print(x) → output.push(String(x))
+      // 2) 处理 x = value → 用 JS 变量保存
+      // 3) 处理 for i in range(n): → JS for 循环
+      // 4) 处理 if / else → JS if
+      // 5) 处理 True/False/None → true/false/null
+      // 6) 处理 len(...) / str(...) / int(...) / float(...)
+      // 7) 处理 input() → 返回空字符串（避免阻塞）
+      // 8) 处理 list/dict 字面量
+
+      // 简单行解析器：按缩进维护块
+      const lines = code.split('\n');
+      // 将多行合并为可执行语句列表（简化：不支持嵌套太深）
+      // 为了让这部分尽量简单，我们采用"把代码转换为 JS"的方案
+
+      let jsCode = '';
+      let indentStack: number[] = [0]; // 当前各层缩进
+
+      const stripInlineComment = (l: string): string => {
+        // 移除行尾 #注释（保留字符串中的 # 很复杂，简单处理）
+        let inStr: string | null = null;
+        for (let i = 0; i < l.length; i++) {
+          const c = l[i];
+          if (inStr) { if (c === inStr && l[i - 1] !== '\\') inStr = null; }
+          else if (c === '"' || c === "'") inStr = c;
+          else if (c === '#') return l.substring(0, i);
+        }
+        return l;
+      };
+
+      // 将 Python 表达式转换为 JS（粗粒度）
+      const pyExprToJS = (expr: string): string => {
+        let s = expr.trim();
+        // print(...) → 函数调用（单独处理）
+        // True/False/None
+        s = s.replace(/\bTrue\b/g, 'true').replace(/\bFalse\b/g, 'false').replace(/\bNone\b/g, 'null');
+        // len(x) → (Array.isArray(x)?x.length:String(x).length)
+        s = s.replace(/\blen\s*\(([^)]+)\)/g, '(function(_x){return (Array.isArray(_x))?_x.length:String(_x).length;})($1)');
+        // str(x)/int(x)/float(x)
+        s = s.replace(/\bstr\s*\(([^)]+)\)/g, 'String($1)');
+        s = s.replace(/\bint\s*\(([^)]+)\)/g, 'parseInt($1,10)');
+        s = s.replace(/\bfloat\s*\(([^)]+)\)/g, 'parseFloat($1)');
+        // input(...) → prompt 或 空串
+        s = s.replace(/\binput\s*\(([^)]*)\)/g, '(__prompt($1))');
+        // range(a,b) / range(n) 生成数组（只在 for-in 中特别处理，其它地方转为数组）
+        s = s.replace(/\brange\s*\(([^)]+)\)/g, '__range($1)');
+        // and/or/not → &&/||/!
+        s = s.replace(/\band\b/g, '&&').replace(/\bor\b/g, '||').replace(/\bnot\b/g, '!');
+        // list/dict 字面量与 Python 很像，直接返回
+        // x in list → list.includes(x) 粗略处理
+        s = s.replace(/\s+in\s+/g, ' in '); // 保留 JS 的 in 关键字
+        return s;
+      };
+
+      // 前置辅助函数定义
+      const helpers = `
+        var __out = [];
+        function print(){
+          var args = Array.prototype.slice.call(arguments);
+          __out.push(args.map(function(x){return (x===null)?'None':(typeof x==='boolean'?(x?'True':'False'):String(x));}).join(' '));
+        }
+        function __prompt(msg){
+          try {
+            var v = window.prompt(msg || '');
+            return (v===null)?'':v;
+          } catch(e) { return ''; }
+        }
+        function __range(){
+          var args = Array.prototype.slice.call(arguments);
+          var start=0, stop=0, step=1;
+          if (args.length===1) stop=args[0];
+          else if (args.length===2){ start=args[0]; stop=args[1]; }
+          else if (args.length>=3){ start=args[0]; stop=args[1]; step=args[2]; }
+          var res = [];
+          if (step>0){ for (var i=start; i<stop; i+=step) res.push(i); }
+          else if (step<0){ for (var i=start; i>stop; i+=step) res.push(i); }
+          return res;
+        }
+      `;
+
+      // 逐行解析并构建 JS 代码块（支持单级缩进，简化版）
+      // 把 Python 块缩进转换为 JS {}
+      let pyStatements: string[] = [];
+      for (let i = 0; i < lines.length; i++) {
+        let line = lines[i];
+        let stripped = stripInlineComment(line).replace(/\s+$/, '');
+        if (!stripped.trim()) continue;
+        pyStatements.push(stripped);
       }
 
-      // 动态加载 pyodide.js
-      const script = document.createElement('script');
-      script.src = 'https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js';
-      script.async = true;
-      script.onload = () => {
-        (window as any).loadPyodide({ indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.26.2/full/' })
-          .then((py: any) => {
-            pyodideRef.current = py;
-            setPyodideReady(true);
-            resolve(py);
-          })
-          .catch(reject);
+      // 用缩进栈构建带大括号的 JS
+      let currentIndent = 0;
+      const indentOf = (l: string): number => {
+        let n = 0;
+        while (n < l.length && l[n] === ' ') n++;
+        return n;
       };
-      script.onerror = () => {
-        pyodideLoadingRef.current = false;
-        reject(new Error('无法加载 Python 解释器'));
-      };
-      document.head.appendChild(script);
-    });
+
+      const emit = (line: string) => { jsCode += line + '\n'; };
+
+      // 维护需要关闭的块数
+      let openBlocks: number[] = [0]; // 每层块对应的缩进位置
+
+      for (let i = 0; i < pyStatements.length; i++) {
+        const raw = pyStatements[i];
+        const indent = indentOf(raw);
+        const content = raw.trim();
+
+        // 关闭需要关闭的块
+        while (openBlocks.length > 1 && indent < openBlocks[openBlocks.length - 1]) {
+          openBlocks.pop();
+          emit('}');
+        }
+
+        // 判断是否是块级语句
+        let blockMatch = content.match(/^(for|while|if|elif|else)\b(.*):\s*$/);
+        let isBlock = !!blockMatch;
+
+        if (isBlock) {
+          const keyword = blockMatch![1];
+          let rest = blockMatch![2].trim();
+
+          if (keyword === 'for') {
+            // for i in range(n):
+            const m = rest.match(/^(\w+)\s+in\s+(.+)$/);
+            if (m) {
+              const v = m[1];
+              const iterExpr = pyExprToJS(m[2]);
+              emit(`for (var ${v} of ${iterExpr}) {`);
+              openBlocks.push(indent);
+              continue;
+            }
+          } else if (keyword === 'while') {
+            emit(`while (${pyExprToJS(rest)}) {`);
+            openBlocks.push(indent);
+            continue;
+          } else if (keyword === 'if') {
+            emit(`if (${pyExprToJS(rest)}) {`);
+            openBlocks.push(indent);
+            continue;
+          } else if (keyword === 'elif') {
+            emit(`} else if (${pyExprToJS(rest)}) {`);
+            continue;
+          } else if (keyword === 'else') {
+            emit(`} else {`);
+            continue;
+          }
+        }
+
+        // 普通语句
+        // print(...)
+        const printMatch = content.match(/^print\s*\((.*)\)\s*$/);
+        if (printMatch) {
+          emit(`print(${pyExprToJS(printMatch[1])});`);
+          continue;
+        }
+        // 赋值 a = expr
+        const assignMatch = content.match(/^(\w+(?:\s*,\s*\w+)*)\s*=\s*(.+)$/);
+        if (assignMatch) {
+          const lhs = assignMatch[1];
+          const rhs = pyExprToJS(assignMatch[2]);
+          // 首声明用 var（同名再赋值会覆盖）
+          emit(`var ${lhs} = ${rhs};`);
+          continue;
+        }
+        // 表达式语句
+        emit(pyExprToJS(content) + ';');
+      }
+
+      // 关闭剩余块
+      while (openBlocks.length > 1) {
+        openBlocks.pop();
+        emit('}');
+      }
+
+      // 组合
+      const fullCode = helpers + jsCode + '\nreturn __out.join("\\n");';
+
+      // eslint-disable-next-line no-new-func
+      const fn = new Function(fullCode);
+      const result = fn();
+      return result || '(代码运行成功，没有输出内容)';
+    } catch (err: any) {
+      return `⚠️ 内置解释器执行失败：\n${err?.message || err}\n\n建议：切换到 Pyodide 模式（点击▶ 运行代码），或检查语法（注意 Python 缩进是 4 个空格）。`;
+    }
   };
 
   if (!course) {
@@ -339,25 +526,97 @@ export default function CourseDetail() {
     }
 
     setRunningExercise(exerciseId);
-    setExerciseOutput(prev => ({ ...prev, [exerciseId]: '⏳ Python 解释器加载中...\n' }));
+    setExerciseOutput(prev => ({ ...prev, [exerciseId]: '⏳ 正在加载 Python 解释器...（首次需要10-20秒）\n' }));
 
+    // 将用户代码编码为 base64，避免字符串嵌入问题
+    let codeB64 = '';
+    try {
+      codeB64 = btoa(unescape(encodeURIComponent(code)));
+    } catch {
+      // UTF-8 安全版
+      codeB64 = btoa(code);
+    }
+
+    // ============ 策略 1：Pyodide（首选） ============
     try {
       const pyodide = await loadPyodide();
 
-      // 将 stdout 捕获到
-      let stdoutOutput = '';
-      pyodide.setStdout({ batched: (s: string) => { stdoutOutput += s; } });
+      // 用 base64 传递用户代码，避免三重引号和特殊字符问题
+      // 思路：import base64 -> exec(base64.b64decode(b64).decode())
+      // 同时用 sys.stdout = io.StringIO() 捕获输出
+      const runScript = `
+import sys, io, base64
+
+__code_b64 = "${codeB64}"
+
+# 捕获 stdout
+__old = sys.stdout
+__buf = io.StringIO()
+sys.stdout = __buf
+
+# 用自定义的 input() 替换（返回空串以避免阻塞）
+def __safe_input(prompt=''):
+    if prompt:
+        sys.stdout = __old
+        print(prompt, end='', flush=True)
+        sys.stdout = __buf
+    return ''
+
+try:
+    import builtins
+    builtins.input = __safe_input
+except:
+    pass
+
+# 执行用户代码
+try:
+    exec(base64.b64decode(__code_b64).decode('utf-8'))
+except Exception as __e:
+    import traceback
+    traceback.print_exc()
+finally:
+    sys.stdout = __old
+
+__txt = __buf.getvalue()
+if not __txt.strip():
+    __txt = '(代码运行成功，没有输出内容)'
+__txt
+`;
 
       try {
-        await pyodide.runPythonAsync(code);
-        const output = stdoutOutput || '(代码运行成功，没有输出内容)';
-        setExerciseOutput(prev => ({ ...prev, [exerciseId]: output }));
+        // 也尝试 setStdout 作为备份
+        let fallbackOutput = '';
+        try {
+          pyodide.setStdout({ batched: (s: string) => { fallbackOutput += s; } });
+        } catch (e) {}
+
+        const result: string = await pyodide.runPythonAsync(runScript);
+        const finalOutput = result || fallbackOutput || '(代码运行成功，没有输出内容)';
+        setExerciseOutput(prev => ({ ...prev, [exerciseId]: finalOutput }));
+        setRunningExercise(null);
+        return;
       } catch (err: any) {
         const errorMsg = err?.message || String(err) || '未知错误';
-        setExerciseOutput(prev => ({ ...prev, [exerciseId]: `❌ 错误：\n${errorMsg}` }));
+        setExerciseOutput(prev => ({ ...prev, [exerciseId]: `❌ Pyodide 执行错误：\n${errorMsg}\n\n--- 尝试使用内置解释器 ---\n` }));
+        // 继续尝试内置解释器
       }
     } catch (err: any) {
-      setExerciseOutput(prev => ({ ...prev, [exerciseId]: `⚠️ 加载失败：${err?.message || err}\n\n请检查网络连接，或在本地 Python 环境中运行以下代码：\n\n${code}` }));
+      setExerciseOutput(prev => ({ ...prev, [exerciseId]: `⚠️ Pyodide 加载失败：${err?.message || err}\n\n--- 切换到内置解释器 ---\n` }));
+      // 继续尝试内置解释器
+    }
+
+    // ============ 策略 2：内置 JS 简易 Python 解释器（备用） ============
+    try {
+      const result = runPythonJS(code);
+      setExerciseOutput(prev => ({
+        ...prev,
+        [exerciseId]: (prev[exerciseId] || '') + result
+      }));
+    } catch (err: any) {
+      setExerciseOutput(prev => ({
+        ...prev,
+        [exerciseId]: (prev[exerciseId] || '') + `\n⚠️ 内置解释器也失败：${err?.message || err}\n\n建议：检查语法（Python 用4空格缩进），或在本地 Python 环境运行。`
+      }));
     } finally {
       setRunningExercise(null);
     }
