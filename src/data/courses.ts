@@ -84,20 +84,26 @@ print(f"统计数据：{calculate_stats(nums)}")` },
           starterCode: `import random
 
 def guess_number():
-    """玩家猜，系统想"""
+    """玩家猜数字：系统想一个1-100的数，玩家输入猜测，系统提示 猜大了/猜小了"""
     target = random.randint(1, 100)
     attempts = 0
-    # 在这里编写代码
+    print("🎮 欢迎来到猜数字游戏！")
+    print("我已经想好了一个1到100之间的数字。")
+    # 在这里编写 while True 循环，获取用户输入并判断大小
 
 def computer_guess():
-    """系统猜，玩家想（使用二分法）"""
-    # 在这里编写代码
+    """系统猜数字：玩家想一个1-100的数，系统用二分法猜，玩家用 大/小/对 来提示"""
+    print("🔄 角色互换！你想一个1-100之间的数字，我来猜。")
+    input("想好了吗？按回车开始...")
+    low, high = 1, 100
+    attempts = 0
+    # 在这里编写二分法搜索循环
 
 # 主菜单
 while True:
     print("\\n===== 猜数字游戏 =====")
-    print("1. 我猜你想")
-    print("2. 你猜我想")
+    print("1. 我猜你想（玩家猜）")
+    print("2. 你猜我想（系统猜）")
     print("3. 退出")
     choice = input("请选择模式 (1/2/3): ")
     if choice == '1':
@@ -105,7 +111,7 @@ while True:
     elif choice == '2':
         computer_guess()
     elif choice == '3':
-        print("再见！")
+        print("👋 再见！")
         break`,
           solution: `import random
 
@@ -120,9 +126,9 @@ def guess_number():
             guess = int(input("请输入你的猜测: "))
             attempts += 1
             if guess < target:
-                print("⬆️ 太小了！再试一次。")
+                print(f"⬆️ 太小了！猜小了，再大一点试试。")
             elif guess > target:
-                print("⬇️ 太大了！再试一次。")
+                print(f"⬇️ 太大了！猜大了，再小一点试试。")
             else:
                 print(f"🎉 恭喜你，猜对了！用了 {attempts} 次尝试。")
                 break
@@ -130,35 +136,40 @@ def guess_number():
             print("❌ 请输入有效的数字！")
 
 def computer_guess():
-    """猜数字游戏 - 系统猜，玩家想"""
+    """猜数字游戏 - 系统猜，玩家想（二分法）"""
     print("🔄 角色互换！你想一个1-100之间的数字，我来猜。")
     input("想好了吗？按回车开始...")
     low, high = 1, 100
     attempts = 0
-    while True:
+    while low <= high:
         attempts += 1
-        guess = (low + high) // 2  # 二分法
-        response = input(f"我猜是 {guess}，太大(T)、太小(S)、还是猜对了(Y)？").strip().upper()
-        
-        if response == 'Y':
+        guess = (low + high) // 2
+        response = input(f"我猜是 {guess}\\n  猜大了请输入：大 或 d 或 D 或 T\\n  猜小了请输入：小 或 x 或 X 或 S\\n  猜对了请输入：对 或 y 或 Y\\n请输入: ").strip().lower()
+
+        if response in ['对', 'y', '']:
             print(f"🎉 我猜对了！用了 {attempts} 次尝试。")
             break
-        elif response == 'T':
+        elif response in ['大', 'd', 't']:
+            # 猜大了：目标数比 guess 小，所以搜索上界调整为 guess - 1
             high = guess - 1
-        elif response == 'S':
+        elif response in ['小', 'x', 's']:
+            # 猜小了：目标数比 guess 大，所以搜索下界调整为 guess + 1
             low = guess + 1
         else:
-            print("❌ 请输入 T(太大)、S(太小) 或 Y(猜对)")
+            print("❌ 输入无效，请输入 大/小/对，或 d/x/y")
             attempts -= 1
+    else:
+        # while-else：循环正常结束（low > high），说明输入有矛盾
+        print("🤔 搜索范围出错了，你可能输入有误，让我们再检查一下...")
 
 # 主菜单
 while True:
     print("\\n===== 猜数字游戏 =====")
-    print("1. 我猜你想")
-    print("2. 你猜我想")
+    print("1. 我猜你想（玩家猜）")
+    print("2. 你猜我想（系统猜）")
     print("3. 退出")
     choice = input("请选择模式 (1/2/3): ")
-    
+
     if choice == '1':
         guess_number()
     elif choice == '2':
@@ -168,11 +179,12 @@ while True:
         break
     else:
         print("❌ 请输入 1、2 或 3")`,
-          explanation: "使用 random.randint() 生成随机数，用 while 循环让用户持续猜测。第二个函数使用二分法让电脑猜测，玩家给出提示。主菜单支持模式选择。",
+          explanation: "guess_number()：用 random.randint() 生成目标数，while True 循环读取用户输入，用 if/elif/else 判断 guess 与 target 的大小，分别提示 猜小了（太小了）或 猜大了（太大了），用 try-except 捕获非数字输入。computer_guess()：用二分法在 [low, high] 区间内搜索，每次猜中间值 guess=(low+high)//2。玩家可以用多种方式输入：大/d/D/T 表示猜大了（high=guess-1），小/x/X/S 表示猜小了（low=guess+1），对/y/Y 表示猜对。while-else 在搜索范围失效时提示输入错误。",
           hints: [
-            "需要使用 while True 无限循环，让用户可以反复猜，直到猜对。循环内用 input() 获取用户输入，用 int() 转成整数。",
-            "核心逻辑：用 if/elif/else 判断 guess 与 target 的大小关系，分别输出 太小了/太大了/猜对了。猜对后用 break 跳出循环。",
-            "在 input() 外面包裹 try-except ValueError，防止用户输入非数字导致程序崩溃。用 attempts 变量记录猜测次数。"
+            "guess_number()：用 while True 无限循环，循环内 input() 获取用户输入后用 int() 转换。用 try-except ValueError 防止用户输入非数字时崩溃。if guess < target 提示猜小了，elif guess > target 提示猜大了，else 就是猜对了，用 break 退出循环。",
+            "computer_guess()：核心是二分法，维护 low 和 high 两个边界。每次 guess = (low + high) // 2 取中间值。用户说'猜大了'意味着目标 < guess，所以 high = guess - 1；用户说'猜小了'意味着目标 > guess，所以 low = guess + 1。正确收缩范围才能让搜索有效。",
+            "输入方式：用户可能输入中文（大/小/对）、英文大写字母（D/T/X/S/Y）、英文小写字母（d/t/x/s/y）。统一用 .strip().lower() 把输入标准化，然后用列表成员判断 response in ['大', 'd', 't'] 来匹配多种合法输入。",
+            "while-else 结构：while 后面的 else 块只有在循环正常结束（没有被 break 中断）时才执行。当 low > high 时，说明搜索范围已经失效，很可能是玩家输入前后矛盾，这时在 else 中给出提示非常友好。"
           ],
           commonErrors: [
             { error: "未处理异常", description: "没有处理用户输入非数字的情况", solution: "使用 try-except 捕获 ValueError" },
@@ -867,6 +879,10 @@ count_items()`,
       content: "本章学习使用Matplotlib和Seaborn创建专业的数据可视化图表，掌握折线图、柱状图、散点图等常用图表的绘制方法。",
       codeExamples: [
         { title: "创建折线图", code: `import matplotlib.pyplot as plt
+# 浏览器环境中确保中文正常显示
+plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'SimHei', 'Arial Unicode MS']
+plt.rcParams['axes.unicode_minus'] = False
+
 months = ['1月', '2月', '3月', '4月', '5月', '6月']
 sales = [120, 150, 180, 160, 200, 230]
 plt.figure(figsize=(10, 6))
@@ -877,6 +893,10 @@ plt.ylabel('销售额（万元）', fontsize=12)
 plt.grid(True, alpha=0.3)
 plt.show()` },
         { title: "创建柱状图", code: `import matplotlib.pyplot as plt
+# 浏览器环境中确保中文正常显示
+plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'SimHei', 'Arial Unicode MS']
+plt.rcParams['axes.unicode_minus'] = False
+
 categories = ['产品A', '产品B', '产品C', '产品D', '产品E']
 values = [350, 280, 420, 180, 300]
 plt.figure(figsize=(10, 6))
@@ -889,6 +909,10 @@ for bar in bars:
 plt.show()` },
         { title: "创建散点图", code: `import matplotlib.pyplot as plt
 import numpy as np
+# 浏览器环境中确保中文正常显示
+plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'SimHei', 'Arial Unicode MS']
+plt.rcParams['axes.unicode_minus'] = False
+
 np.random.seed(42)
 x = np.random.rand(100) * 10
 y = 2 * x + np.random.randn(100) * 3 + 5
@@ -907,12 +931,19 @@ plt.show()` },
           question: "骰子游戏：编写模拟掷骰子游戏，统计各种点数出现次数并用柱状图展示",
           starterCode: `import random
 import matplotlib.pyplot as plt
+# 浏览器环境中确保中文正常显示
+plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'SimHei', 'Arial Unicode MS']
+plt.rcParams['axes.unicode_minus'] = False
 def dice_game(rolls=1000):
     # 在这里编写代码
 dice_game()`,
           solution: `import random
 import matplotlib.pyplot as plt
 from collections import Counter
+# 浏览器环境中确保中文正常显示
+plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'SimHei', 'Arial Unicode MS']
+plt.rcParams['axes.unicode_minus'] = False
+
 def dice_game(rolls=1000):
     results = [random.randint(1, 6) for _ in range(rolls)]
     counter = Counter(results)
@@ -930,11 +961,11 @@ def dice_game(rolls=1000):
     plt.xticks(nums)
     plt.show()
 dice_game()`,
-          explanation: "使用列表推导式和 random.randint() 模拟掷骰子，Counter 统计各点数次数，用柱状图可视化。",
+          explanation: "使用列表推导式和 random.randint() 模拟掷骰子，Counter 统计各点数次数，用柱状图可视化。开头加上 plt.rcParams 配置字体，确保中文标签在浏览器中正常显示而不会乱码。",
           hints: [
             "用列表推导式 [random.randint(1, 6) for _ in range(rolls)] 生成 rolls 次骰子结果。然后用 Counter(results) 统计各点数出现次数。",
             "打印结果时遍历 range(1, 7) 用 counter.get(num, 0) 获取每个点数的次数，这样即使某点数没出现也不会报错。",
-            "绘图部分：x轴用 nums = list(range(1, 7))，y轴用列表推导 [counter.get(num, 0) for num in nums]。plt.bar() 画柱状图，plt.xticks(nums) 确保每个点数都有刻度标签。"
+            "绘图前加上 plt.rcParams['font.sans-serif'] 和 plt.rcParams['axes.unicode_minus'] 配置，确保图表中文标签正常显示。x轴用 nums = list(range(1, 7))，plt.bar() 画柱状图，plt.xticks(nums) 确保每个点数都有刻度。"
           ],
           commonErrors: [
             { error: "未设置随机种子", description: "结果不可复现", solution: "可添加 random.seed() 使结果固定" },
@@ -946,11 +977,18 @@ dice_game()`,
           question: "简单统计计算：编写代码生成随机数据并计算基础统计量，然后绘制折线图",
           starterCode: `import random
 import matplotlib.pyplot as plt
+# 浏览器环境中确保中文正常显示
+plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'SimHei', 'Arial Unicode MS']
+plt.rcParams['axes.unicode_minus'] = False
 def stats_and_plot():
     # 在这里编写代码
 stats_and_plot()`,
           solution: `import random
 import matplotlib.pyplot as plt
+# 浏览器环境中确保中文正常显示
+plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'SimHei', 'Arial Unicode MS']
+plt.rcParams['axes.unicode_minus'] = False
+
 def stats_and_plot():
     random.seed(42)
     months = list(range(1, 13))
@@ -969,11 +1007,11 @@ def stats_and_plot():
     plt.xticks(months)
     plt.show()
 stats_and_plot()`,
-          explanation: "使用 random.randint() 生成随机数据，计算统计量，然后用折线图展示趋势。",
+          explanation: "使用 random.randint() 生成随机数据，计算统计量，然后用折线图展示趋势。plt.rcParams 配置字体让中文标签正常显示。",
           hints: [
             "random.seed(42) 固定随机种子让结果可复现。months = list(range(1, 13)) 生成1-12月，sales = [random.randint(50, 200) for _ in range(12)] 生成12个随机销售数据。",
             "计算：total = sum(sales), avg = total / len(sales)。然后 plt.plot() 绘制折线，marker='o' 让每个数据点显示为圆圈。",
-            "plt.axhline(y=avg, color='red', linestyle='--') 画一条红色虚线代表平均值。plt.legend() 显示图例，plt.xticks(months) 确保12个月都有刻度。"
+            "绘图前记得设置 plt.rcParams，否则中文标签可能显示为方框或乱码。plt.axhline(y=avg, color='red', linestyle='--') 画一条红色虚线代表平均值。plt.legend() 显示图例，plt.xticks(months) 确保12个月都有刻度。"
           ],
           commonErrors: [
             { error: "刻度不清晰", description: "未设置 xticks 导致横坐标显示不全", solution: "使用 plt.xticks() 设置清晰的刻度" },
@@ -984,6 +1022,10 @@ stats_and_plot()`,
           type: "coding",
           question: "列表操作：编写代码将两个列表中的数据绘制成对比柱状图",
           starterCode: `import matplotlib.pyplot as plt
+import numpy as np
+# 浏览器环境中确保中文正常显示
+plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'SimHei', 'Arial Unicode MS']
+plt.rcParams['axes.unicode_minus'] = False
 def compare_chart():
     subjects = ['语文', '数学', '英语', '物理', '化学']
     class_a = [85, 78, 92, 70, 80]
@@ -992,6 +1034,10 @@ def compare_chart():
 compare_chart()`,
           solution: `import matplotlib.pyplot as plt
 import numpy as np
+# 浏览器环境中确保中文正常显示
+plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'SimHei', 'Arial Unicode MS']
+plt.rcParams['axes.unicode_minus'] = False
+
 def compare_chart():
     subjects = ['语文', '数学', '英语', '物理', '化学']
     class_a = [85, 78, 92, 70, 80]
@@ -1011,11 +1057,11 @@ def compare_chart():
     plt.tight_layout()
     plt.show()
 compare_chart()`,
-          explanation: "使用 numpy.arange() 创建位置索引，通过调整柱子位置实现并排柱状图。",
+          explanation: "使用 numpy.arange() 创建位置索引，通过调整柱子位置实现并排柱状图。plt.rcParams 配置字体让中文标签（科目、平均分、A班、B班）正常显示。",
           hints: [
             "并排柱状图的关键是给两组柱子分配不同的x位置。用 x = np.arange(len(subjects)) 生成0,1,2,...作为每组柱子的中心位置。",
             "设置 width = 0.35，然后第一组柱子放在 x - width/2，第二组放在 x + width/2。这样两组柱子彼此相邻且不重叠。",
-            "使用 ax.bar() 而不是 plt.bar() 配合 fig, ax = plt.subplots() 能更精确地控制。ax.set_xticks(x) 和 ax.set_xticklabels(subjects) 设置刻度。plt.tight_layout() 自动调整间距防标签被截。"
+            "使用 ax.bar() 配合 fig, ax = plt.subplots() 更精确地控制。ax.set_xticks(x) 和 ax.set_xticklabels(subjects) 设置刻度。别忘了开头设置 plt.rcParams 让中文正常显示。plt.tight_layout() 自动调整间距防止标签被截断。"
           ],
           commonErrors: [
             { error: "柱子重叠", description: "两班柱子位置设置错误导致完全重叠", solution: "使用 x +/- width/2 分别设置两组柱子位置" },
