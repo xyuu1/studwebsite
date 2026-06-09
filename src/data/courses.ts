@@ -6,6 +6,7 @@ export interface Exercise {
   starterCode: string;
   solution: string;
   explanation: string;
+  hints?: string[];
   commonErrors?: { error: string; description: string; solution: string; }[];
 }
 
@@ -16,6 +17,7 @@ export interface Quiz {
   options?: string[];
   correctAnswer: string | boolean;
   explanation: string;
+  hints?: string[];
 }
 
 export interface Chapter {
@@ -102,6 +104,11 @@ def guess_number():
         except ValueError: print("请输入有效的数字！")
 guess_number()`,
           explanation: "使用 random.randint() 生成随机数，用 while 循环让用户持续猜测，根据猜测结果给出提示。try-except 处理非法输入。",
+          hints: [
+            "需要使用 while True 无限循环，让用户可以反复猜，直到猜对。循环内用 input() 获取用户输入，用 int() 转成整数。",
+            "核心逻辑：用 if/elif/else 判断 guess 与 target 的大小关系，分别输出 太小了/太大了/猜对了。猜对后用 break 跳出循环。",
+            "在 input() 外面包裹 try-except ValueError，防止用户输入非数字导致程序崩溃。用 attempts 变量记录猜测次数。"
+          ],
           commonErrors: [
             { error: "未处理异常", description: "没有处理用户输入非数字的情况", solution: "使用 try-except 捕获 ValueError" },
             { error: "循环无结束条件", description: "忘记在猜对时 break 跳出循环", solution: "在猜对时添加 break" },
@@ -132,6 +139,11 @@ def rock_paper_scissors():
         else: print("你输了！")
 rock_paper_scissors()`,
           explanation: "使用 random.choice() 让电脑随机选择，通过 if-elif 判断胜负关系。",
+          hints: [
+            "首先用 while True 构建游戏主循环，在循环内用 input() 获取玩家输入。检查玩家输入是否在 choices 列表中，不合法则 continue 跳过。",
+            "用 random.choice(choices) 让电脑随机选择。胜负判断：玩家胜的情况只有3种——石头胜剪刀、剪刀胜布、布胜石头，用 or 连接这3个条件。",
+            "如果玩家输入'退出'则 break 结束循环。可以用 f-string 打印电脑选择，让界面更友好。"
+          ],
           commonErrors: [
             { error: "判断逻辑错误", description: "胜负判断条件有误", solution: "正确列出所有玩家获胜的情况" },
           ]
@@ -153,6 +165,11 @@ print(fibonacci(10))`,
     return fib
 print(fibonacci(10))`,
           explanation: "斐波那契数列的每个数是前两个数的和，用列表存储序列，循环逐步生成后续的数。",
+          hints: [
+            "先处理边界情况：n <= 0 返回空列表 []，n == 1 返回 [0]，n == 2 返回 [0, 1]。",
+            "从第3个数开始，每个新数 = 列表中最后一个数 + 列表中倒数第二个数。可以用 for 循环从 2 遍历到 n。",
+            "用 fib.append(fib[i-1] + fib[i-2]) 不断追加新元素。最后 return 整个列表。注意 Python 的 range 是左闭右开区间。"
+          ],
           commonErrors: [
             { error: "边界情况处理", description: "没有处理n为0或1的情况", solution: "先判断n的大小并返回相应结果" },
           ]
@@ -380,6 +397,11 @@ todo_manager()`,
             break
 todo_manager()`,
           explanation: "通过列表存储任务，使用循环提供菜单选择，列表的 append() 和 pop() 方法实现添加和删除功能。",
+          hints: [
+            "先用 todos = [] 初始化一个空列表存储任务。然后用 while True 构建菜单循环，让用户反复操作。菜单用 print() 显示选项编号。",
+            "用 input() 获取用户选择，然后用 if/elif 分别处理：'1' 添加任务用 todos.append()；'2' 查看任务用 for 循环配合 enumerate(, 1) 从1开始编号；'3' 删除任务用 todos.pop(idx)。",
+            "删除前先检查索引是否有效（0 <= idx < len(todos)），避免 IndexError。用户选择 '4' 时 break 退出循环。用 if not todos 判断列表为空的情况。"
+          ],
           commonErrors: [
             { error: "索引越界", description: "删除时没有检查用户输入的编号是否有效", solution: "判断索引是否在有效范围内" },
           ]
@@ -407,6 +429,11 @@ collect_user_info()`,
     return user
 collect_user_info()`,
           explanation: "使用字典存储用户信息，通过 input() 收集数据，使用 try-except 验证年龄输入的有效性。",
+          hints: [
+            "先创建一个空字典 user = {}。用 user['name'] = input(...) 收集姓名，类似地收集邮箱。",
+            "年龄需要转成整数，用 try-except 包裹：try 内写 user['age'] = int(input(...)) 然后 break；except ValueError 时提示用户重输。因为需要反复尝试，所以把这一段放进 while True 循环里。",
+            "最后用 for k, v in user.items() 遍历字典打印每个字段。可以用 \\n 换行让输出更清晰。"
+          ],
           commonErrors: [
             { error: "输入未验证", description: "数字类型输入没有做异常处理", solution: "使用 try-except 捕获 ValueError" },
           ]
@@ -439,6 +466,11 @@ def save_and_load_scores():
         print(f"{name}: {subjects}")
 save_and_load_scores()`,
           explanation: "使用 json.dump() 将字典保存为JSON文件，json.load() 从文件读取数据。with 语句自动管理文件的打开和关闭。",
+          hints: [
+            "用 with open('scores.json', 'w', encoding='utf-8') as f: 打开文件用于写入。在 with 块内调用 json.dump(scores, f, ensure_ascii=False, indent=2) 保存数据。",
+            "ensure_ascii=False 让中文字符正常显示，indent=2 让JSON文件格式美观有缩进。写入后打印提示信息。",
+            "读取时用 with open('scores.json', 'r', encoding='utf-8') as f: 配合 loaded = json.load(f) 获取数据。用 for name, subjects in loaded.items(): 遍历并打印每个学生的成绩。"
+          ],
           commonErrors: [
             { error: "中文乱码", description: "未设置 encoding 和 ensure_ascii 参数", solution: "设置 encoding=utf-8 和 ensure_ascii=False" },
           ]
@@ -562,6 +594,11 @@ shopping_cart()`,
             break
 shopping_cart()`,
           explanation: "使用嵌套字典存储购物车数据，键为商品名，值为包含价格和数量的字典。通过循环和条件语句实现菜单功能。",
+          hints: [
+            "cart = {} 作为主容器，每个商品名是键，值为 {'price': 价格浮点数, 'qty': 数量整数}。用 while True 菜单循环。",
+            "添加商品时：先用 float(input()) 输入价格，int(input()) 输入数量。然后判断 if name in cart: 累加数量，否则 cart[name] = {'price': price, 'qty': qty}。删除用 del cart[name]。",
+            "总价计算可以用 sum(info['price']*info['qty'] for info in cart.values())。查看购物车时用 for name, info in cart.items() 遍历并计算小计。别忘了检查 if not cart: 购物车为空的情况。"
+          ],
           commonErrors: [
             { error: "重复商品处理", description: "添加已有商品时没有累加数量而是覆盖", solution: "先判断是否存在，存在则增加数量" },
           ]
@@ -585,6 +622,11 @@ deduplicate()`,
     print(f"去重后（set方法）：{unique2}")
 deduplicate()`,
           explanation: "Python 3.7+中 dict.fromkeys() 保持插入顺序。如果不关心顺序，直接使用 set() 是最高效的方法。",
+          hints: [
+            "最简单的去重方法是 list(set(items))，但 set 是无序的，可能会改变元素顺序。如果要保持顺序不能用它。",
+            "在 Python 3.7+，dict.fromkeys(items) 会创建一个字典，键来自 items 且保持顺序，再用 list() 转成列表就得到有序去重结果。这是最简洁的写法。",
+            "另一种方法：手动遍历，用一个辅助集合记录已见过的元素。for item in items: 如果 item not in seen: 就 append 到结果列表，并 add 到 seen。可以同时展示两种方法做对比。"
+          ],
           commonErrors: [
             { error: "顺序丢失", description: "使用 set() 去重后元素顺序被打乱", solution: "需要保持顺序时使用 dict.fromkeys() 或手动遍历" },
           ]
@@ -610,6 +652,11 @@ def count_items():
         print(f"  第{i}名：{f}（{c}次）")
 count_items()`,
           explanation: "collections.Counter 是Python内置的高效计数器，most_common() 方法可以直接返回排序结果。",
+          hints: [
+            "Counter 是 collections 模块中的类，只需 Counter(列表) 就能自动统计每个元素出现次数。counter 可以像字典一样用 items() 遍历键值对。",
+            "counter.most_common() 返回按次数从多到少排序的 (元素, 次数) 元组列表。可以传入参数指定返回前N个，例如 counter.most_common(3) 返回前3名。",
+            "遍历时可以用 enumerate(, 1) 加上排名编号。for i, (fruit, count) in enumerate(counter.most_common(), 1): 同时拿到名次、水果名和次数。"
+          ],
           commonErrors: [
             { error: "字典键不存在", description: "手动统计时直接访问未初始化的键", solution: "使用 get(key, 0) 或 defaultdict(int)" },
           ]
@@ -712,6 +759,11 @@ def dice_game(rolls=1000):
     plt.show()
 dice_game()`,
           explanation: "使用列表推导式和 random.randint() 模拟掷骰子，Counter 统计各点数次数，用柱状图可视化。",
+          hints: [
+            "用列表推导式 [random.randint(1, 6) for _ in range(rolls)] 生成 rolls 次骰子结果。然后用 Counter(results) 统计各点数出现次数。",
+            "打印结果时遍历 range(1, 7) 用 counter.get(num, 0) 获取每个点数的次数，这样即使某点数没出现也不会报错。",
+            "绘图部分：x轴用 nums = list(range(1, 7))，y轴用列表推导 [counter.get(num, 0) for num in nums]。plt.bar() 画柱状图，plt.xticks(nums) 确保每个点数都有刻度标签。"
+          ],
           commonErrors: [
             { error: "未设置随机种子", description: "结果不可复现", solution: "可添加 random.seed() 使结果固定" },
           ]
@@ -746,6 +798,11 @@ def stats_and_plot():
     plt.show()
 stats_and_plot()`,
           explanation: "使用 random.randint() 生成随机数据，计算统计量，然后用折线图展示趋势。",
+          hints: [
+            "random.seed(42) 固定随机种子让结果可复现。months = list(range(1, 13)) 生成1-12月，sales = [random.randint(50, 200) for _ in range(12)] 生成12个随机销售数据。",
+            "计算：total = sum(sales), avg = total / len(sales)。然后 plt.plot() 绘制折线，marker='o' 让每个数据点显示为圆圈。",
+            "plt.axhline(y=avg, color='red', linestyle='--') 画一条红色虚线代表平均值。plt.legend() 显示图例，plt.xticks(months) 确保12个月都有刻度。"
+          ],
           commonErrors: [
             { error: "刻度不清晰", description: "未设置 xticks 导致横坐标显示不全", solution: "使用 plt.xticks() 设置清晰的刻度" },
           ]
@@ -783,6 +840,11 @@ def compare_chart():
     plt.show()
 compare_chart()`,
           explanation: "使用 numpy.arange() 创建位置索引，通过调整柱子位置实现并排柱状图。",
+          hints: [
+            "并排柱状图的关键是给两组柱子分配不同的x位置。用 x = np.arange(len(subjects)) 生成0,1,2,...作为每组柱子的中心位置。",
+            "设置 width = 0.35，然后第一组柱子放在 x - width/2，第二组放在 x + width/2。这样两组柱子彼此相邻且不重叠。",
+            "使用 ax.bar() 而不是 plt.bar() 配合 fig, ax = plt.subplots() 能更精确地控制。ax.set_xticks(x) 和 ax.set_xticklabels(subjects) 设置刻度。plt.tight_layout() 自动调整间距防标签被截。"
+          ],
           commonErrors: [
             { error: "柱子重叠", description: "两班柱子位置设置错误导致完全重叠", solution: "使用 x +/- width/2 分别设置两组柱子位置" },
           ]
@@ -888,6 +950,11 @@ def computer_guess():
     print(f"共尝试 {attempts} 次")
 computer_guess()`,
           explanation: "二分法每次将搜索范围缩小一半，时间复杂度为 O(log n)。在1-1000范围内，最多只需10次猜测。",
+          hints: [
+            "初始化 low = 1, high = 1000，每次猜测 guess = (low + high) // 2 取中间值。根据用户反馈调整搜索范围。",
+            "如果用户输入 '>'（表示答案比 guess 大，即猜小了），则 low = guess + 1；如果输入 '<'，则 high = guess - 1；输入 '=' 表示猜中。",
+            "用 attempts 变量记录猜测次数。注意输入非预期符号时提示用户重输，用 continue 跳过本轮循环。循环条件 while low <= high 防止无限循环。"
+          ],
           commonErrors: [
             { error: "边界更新错误", description: "更新 low/high 时忘记加减1导致死循环", solution: "太大时 high=guess-1，太小时 low=guess+1" },
           ]
@@ -919,6 +986,11 @@ def distribution_analysis():
         print(f"{name}: 均值={mean:.1f}, 中位数={median:.1f}, 标准差={std:.1f}, 偏度={skewness:.2f}, 峰度={kurtosis:.2f}")
 distribution_analysis()`,
           explanation: "偏度衡量分布的对称性，峰度衡量分布的陡峭程度。结合均值和中位数关系可以判断分布形状。",
+          hints: [
+            "用 np.random.seed(42) 设置随机种子。生成3种不同分布的数据：normal() 正态分布、exponential() 指数分布（右偏）、uniform() 均匀分布。",
+            "把3个数据集放到一个字典 datasets 中，键是中文名，值是数据数组。然后用 for name, data in datasets.items(): 循环遍历逐个计算。",
+            "每数据集计算：np.mean(data) 均值、np.median(data) 中位数、np.std(data) 标准差、stats.skew(data) 偏度、stats.kurtosis(data) 峰度。用 f-string 统一格式化输出。"
+          ],
           commonErrors: [
             { error: "样本与总体混淆", description: "未注意某些库默认计算的是样本统计量", solution: "注意查看文档是否需要调整参数（如 ddof）" },
           ]
@@ -959,6 +1031,11 @@ def regression_analysis():
     plt.show()
 regression_analysis()`,
           explanation: "使用 scipy.stats.linregress() 进行最小二乘线性回归，得到斜率、截距和R^2。R^2越接近1，模型拟合越好。",
+          hints: [
+            "先用 np.array() 把学习时长和分数转换成NumPy数组。stats.pearsonr(hours, scores) 计算Pearson相关系数，返回 (相关系数, p值)。",
+            "stats.linregress() 返回5个值：slope 斜率、intercept 截距、r_value 相关系数、p_val p值、std_err 标准误。R^2 = r_value 的平方。",
+            "预测：用 y = slope * x + intercept 公式。绘图：plt.scatter() 画实际数据点，plt.plot() 用 np.linspace() 生成100个平滑点画回归线。别忘了用 label 参数配合 plt.legend() 显示图例。"
+          ],
           commonErrors: [
             { error: "因果误解", description: "把相关性误判为因果关系", solution: "相关不代表因果，需谨慎解读回归结果" },
           ]

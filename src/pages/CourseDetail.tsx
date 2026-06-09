@@ -25,6 +25,7 @@ export default function CourseDetail() {
 
   // 编程练习状态
   const [exerciseAnswers, setExerciseAnswers] = useState<Record<number, ExerciseAnswerState>>({});
+  const [exerciseCode, setExerciseCode] = useState<Record<number, string>>({});
 
   // 提示状态（编程题 + 选择题 + 判断题共用）
   const [hintStates, setHintStates] = useState<HintStates>({});
@@ -132,7 +133,10 @@ export default function CourseDetail() {
   };
 
   // 根据解析内容智能生成3条渐进式提示
-  const generateHintsFromExplanation = (explanation: string, correctAnswer: string | boolean, type: 'mc' | 'tf'): string[] => {
+  const generateHintsFromExplanation = (explanation: string, correctAnswer: string | boolean, type: 'mc' | 'tf', customHints?: string[]): string[] => {
+    if (customHints && customHints.length >= 3) {
+      return customHints;
+    }
     if (type === 'mc') {
       return [
         `这道题考察的是相关知识点的理解。仔细阅读题目，回忆相关概念的核心定义。`,
@@ -174,6 +178,7 @@ export default function CourseDetail() {
   // ============ 重置功能 ============
   const resetExercises = () => {
     setExerciseAnswers({});
+    setExerciseCode({});
     resetHintsByPrefix('exercise');
   };
 
@@ -412,11 +417,24 @@ export default function CourseDetail() {
                 {chapter.exercises.map((exercise) => {
                   const hintKey = getHintKey('exercise', exercise.id);
                   const isExpanded = exerciseAnswers[exercise.id]?.expanded ?? false;
-                  const hints: string[] = [
-                    `先理解题目要求，确定需要使用的主要模块或函数。`,
-                    `思考核心逻辑：输入是什么，输出是什么，中间需要哪些步骤？`,
-                    `参考代码示例中的写法，注意边界情况的处理。`
-                  ];
+                  const hints: string[] = exercise.hints && exercise.hints.length >= 3
+                    ? exercise.hints
+                    : [
+                        `先理解题目要求，确定需要使用的主要模块或函数。`,
+                        `思考核心逻辑：输入是什么，输出是什么，中间需要哪些步骤？`,
+                        `参考代码示例中的写法，注意边界情况的处理。`
+                      ];
+
+                  const currentCode = exerciseCode[exercise.id] ?? exercise.starterCode ?? '';
+                  const handleCodeChange = (val: string) => {
+                    setExerciseCode(prev => ({ ...prev, [exercise.id]: val }));
+                  };
+                  const handleResetCode = () => {
+                    setExerciseCode(prev => ({ ...prev, [exercise.id]: exercise.starterCode ?? '' }));
+                  };
+                  const handleCopyCode = () => {
+                    navigator.clipboard.writeText(currentCode);
+                  };
 
                   return (
                     <div key={exercise.id} className="border border-teal-500/20 rounded-lg overflow-hidden">
@@ -440,6 +458,42 @@ export default function CourseDetail() {
                         {renderHintButton(hintKey, hints)}
                       </div>
 
+                      {/* 可编辑代码编辑器 - 始终展示 */}
+                      <div className="p-4 bg-gray-900/50">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2 text-cyan-400 font-semibold text-sm">
+                            <Code className="w-4 h-4" />
+                            你的代码
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={handleResetCode}
+                              className="px-3 py-1 text-xs border border-gray-600 text-gray-400 rounded hover:bg-gray-700 hover:text-white transition-all flex items-center gap-1"
+                            >
+                              <RefreshCw className="w-3 h-3" />
+                              重置为起始代码
+                            </button>
+                            <button
+                              onClick={handleCopyCode}
+                              className="px-3 py-1 text-xs border border-gray-600 text-gray-400 rounded hover:bg-gray-700 hover:text-white transition-all flex items-center gap-1"
+                            >
+                              <Copy className="w-3 h-3" />
+                              复制代码
+                            </button>
+                          </div>
+                        </div>
+                        <textarea
+                          value={currentCode}
+                          onChange={(e) => handleCodeChange(e.target.value)}
+                          spellCheck={false}
+                          className="w-full h-48 bg-gray-950 text-green-300 font-mono text-sm p-3 border border-gray-700 rounded-lg focus:outline-none focus:border-teal-500/60 resize-y"
+                          placeholder="# 在这里编写你的代码..."
+                        />
+                        <div className="mt-2 text-xs text-gray-500">
+                          💡 提示：编写完代码后，可复制到 Python 环境中运行，也可以点击右侧「查看答案」对比参考答案。
+                        </div>
+                      </div>
+
                       {isExpanded && (
                         <div className="divide-y divide-gray-700">
                           {/* 起始代码 */}
@@ -457,9 +511,18 @@ export default function CourseDetail() {
 
                           {/* 参考答案 */}
                           <div className="p-4 bg-green-500/10">
-                            <div className="flex items-center gap-2 text-green-400 font-semibold mb-3">
-                              <Check className="w-5 h-5" />
-                              参考答案
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center gap-2 text-green-400 font-semibold">
+                                <Check className="w-5 h-5" />
+                                参考答案
+                              </div>
+                              <button
+                                onClick={() => navigator.clipboard.writeText(exercise.solution)}
+                                className="px-3 py-1 text-xs border border-green-700/50 text-green-400 rounded hover:bg-green-500/10 transition-colors flex items-center gap-1"
+                              >
+                                <Copy className="w-3 h-3" />
+                                复制
+                              </button>
                             </div>
                             <div className="code-block">
                               <pre className="text-gray-100">{exercise.solution}</pre>
@@ -526,7 +589,7 @@ export default function CourseDetail() {
                 <div className="space-y-6">
                   {multipleChoice.map((quiz, idx) => {
                     const hintKey = getHintKey('mc', quiz.id);
-                    const hints = generateHintsFromExplanation(quiz.explanation, quiz.correctAnswer, 'mc');
+                    const hints = generateHintsFromExplanation(quiz.explanation, quiz.correctAnswer, 'mc', quiz.hints);
                     const userAnswer = mcAnswers[quiz.id];
                     const result = mcResults[quiz.id];
                     const isSubmitted = result !== undefined;
@@ -642,7 +705,7 @@ export default function CourseDetail() {
                 <div className="space-y-6">
                   {trueFalse.map((quiz, idx) => {
                     const hintKey = getHintKey('tf', quiz.id);
-                    const hints = generateHintsFromExplanation(quiz.explanation, quiz.correctAnswer, 'tf');
+                    const hints = generateHintsFromExplanation(quiz.explanation, quiz.correctAnswer, 'tf', quiz.hints);
                     const userAnswer = tfAnswers[quiz.id];
                     const result = tfResults[quiz.id];
                     const isSubmitted = result !== undefined;
