@@ -120,28 +120,11 @@ export default function CourseDetail() {
   // 支持: print / 基本运算 / 变量 / if / for range / while / list / dict / len
   // / str / int / float / range / input (直接返回空字符串避免阻塞)
   const runPythonJS = (code: string): string => {
-    const output: string[] = [];
     try {
-      // 最小化的 Python → JS 转译：逐行 / 按块处理
-      // 1) 处理 print(x) → output.push(String(x))
-      // 2) 处理 x = value → 用 JS 变量保存
-      // 3) 处理 for i in range(n): → JS for 循环
-      // 4) 处理 if / else → JS if
-      // 5) 处理 True/False/None → true/false/null
-      // 6) 处理 len(...) / str(...) / int(...) / float(...)
-      // 7) 处理 input() → 返回空字符串（避免阻塞）
-      // 8) 处理 list/dict 字面量
-
-      // 简单行解析器：按缩进维护块
       const lines = code.split('\n');
-      // 将多行合并为可执行语句列表（简化：不支持嵌套太深）
-      // 为了让这部分尽量简单，我们采用"把代码转换为 JS"的方案
 
       let jsCode = '';
-      let indentStack: number[] = [0]; // 当前各层缩进
-
       const stripInlineComment = (l: string): string => {
-        // 移除行尾 #注释（保留字符串中的 # 很复杂，简单处理）
         let inStr: string | null = null;
         for (let i = 0; i < l.length; i++) {
           const c = l[i];
@@ -152,33 +135,31 @@ export default function CourseDetail() {
         return l;
       };
 
-      // 将 Python 表达式转换为 JS（粗粒度）
       const pyExprToJS = (expr: string): string => {
         let s = expr.trim();
-        // print(...) → 函数调用（单独处理）
-        // True/False/None
         s = s.replace(/\bTrue\b/g, 'true').replace(/\bFalse\b/g, 'false').replace(/\bNone\b/g, 'null');
-        // len(x) → (Array.isArray(x)?x.length:String(x).length)
         s = s.replace(/\blen\s*\(([^)]+)\)/g, '(function(_x){return (Array.isArray(_x))?_x.length:String(_x).length;})($1)');
-        // str(x)/int(x)/float(x)
         s = s.replace(/\bstr\s*\(([^)]+)\)/g, 'String($1)');
         s = s.replace(/\bint\s*\(([^)]+)\)/g, 'parseInt($1,10)');
         s = s.replace(/\bfloat\s*\(([^)]+)\)/g, 'parseFloat($1)');
-        // input(...) → prompt 或 空串
         s = s.replace(/\binput\s*\(([^)]*)\)/g, '(__prompt($1))');
-        // range(a,b) / range(n) 生成数组（只在 for-in 中特别处理，其它地方转为数组）
         s = s.replace(/\brange\s*\(([^)]+)\)/g, '__range($1)');
-        // and/or/not → &&/||/!
         s = s.replace(/\band\b/g, '&&').replace(/\bor\b/g, '||').replace(/\bnot\b/g, '!');
-        // list/dict 字面量与 Python 很像，直接返回
-        // x in list → list.includes(x) 粗略处理
-        s = s.replace(/\s+in\s+/g, ' in '); // 保留 JS 的 in 关键字
+        s = s.replace(/\s+in\s+/g, ' in ');
         return s;
       };
 
-      // 前置辅助函数定义
+      // ========== 循环/步数保护 ==========
       const helpers = `
         var __out = [];
+        var __loop_count = 0;
+        var __max_loops = 10000;
+        function __tick(){
+          __loop_count++;
+          if (__loop_count > __max_loops) {
+            throw new Error("⚠️ 循环步数超过限制 (10000步)，可能存在死循环。程序已自动中断。");
+          }
+        }
         function print(){
           var args = Array.prototype.slice.call(arguments);
           __out.push(args.map(function(x){return (x===null)?'None':(typeof x==='boolean'?(x?'True':'False'):String(x));}).join(' '));
@@ -195,15 +176,20 @@ export default function CourseDetail() {
           if (args.length===1) stop=args[0];
           else if (args.length===2){ start=args[0]; stop=args[1]; }
           else if (args.length>=3){ start=args[0]; stop=args[1]; step=args[2]; }
+          // 防止无限/超大数组：限制最多10000个元素
           var res = [];
-          if (step>0){ for (var i=start; i<stop; i+=step) res.push(i); }
-          else if (step<0){ for (var i=start; i>stop; i+=step) res.push(i); }
+          if (step > 0) {
+            // 递增
+            if (stop - start > 10000) stop = start + 10000;
+            for (var i=start; i<stop; i+=step) res.push(i);
+          } else if (step < 0) {
+            if (start - stop > 10000) stop = start - 10000;
+            for (var i=start; i>stop; i+=step) res.push(i);
+          }
           return res;
         }
       `;
 
-      // 逐行解析并构建 JS 代码块（支持单级缩进，简化版）
-      // 把 Python 块缩进转换为 JS {}
       let pyStatements: string[] = [];
       for (let i = 0; i < lines.length; i++) {
         let line = lines[i];
@@ -212,31 +198,25 @@ export default function CourseDetail() {
         pyStatements.push(stripped);
       }
 
-      // 用缩进栈构建带大括号的 JS
-      let currentIndent = 0;
       const indentOf = (l: string): number => {
         let n = 0;
         while (n < l.length && l[n] === ' ') n++;
         return n;
       };
-
       const emit = (line: string) => { jsCode += line + '\n'; };
 
-      // 维护需要关闭的块数
-      let openBlocks: number[] = [0]; // 每层块对应的缩进位置
+      let openBlocks: number[] = [0];
 
       for (let i = 0; i < pyStatements.length; i++) {
         const raw = pyStatements[i];
         const indent = indentOf(raw);
         const content = raw.trim();
 
-        // 关闭需要关闭的块
         while (openBlocks.length > 1 && indent < openBlocks[openBlocks.length - 1]) {
           openBlocks.pop();
           emit('}');
         }
 
-        // 判断是否是块级语句
         let blockMatch = content.match(/^(for|while|if|elif|else)\b(.*):\s*$/);
         let isBlock = !!blockMatch;
 
@@ -245,25 +225,25 @@ export default function CourseDetail() {
           let rest = blockMatch![2].trim();
 
           if (keyword === 'for') {
-            // for i in range(n):
             const m = rest.match(/^(\w+)\s+in\s+(.+)$/);
             if (m) {
               const v = m[1];
               const iterExpr = pyExprToJS(m[2]);
-              emit(`for (var ${v} of ${iterExpr}) {`);
+              // 给 for 循环加 tick 保护
+              emit(`for (var ${v} of (function(){ __tick(); return ${iterExpr}; })()) {`);
               openBlocks.push(indent);
               continue;
             }
           } else if (keyword === 'while') {
-            emit(`while (${pyExprToJS(rest)}) {`);
+            emit(`while (__tick() || (${pyExprToJS(rest)})) {`);
             openBlocks.push(indent);
             continue;
           } else if (keyword === 'if') {
-            emit(`if (${pyExprToJS(rest)}) {`);
+            emit(`if (__tick() || (${pyExprToJS(rest)})) {`);
             openBlocks.push(indent);
             continue;
           } else if (keyword === 'elif') {
-            emit(`} else if (${pyExprToJS(rest)}) {`);
+            emit(`} else if (__tick() || (${pyExprToJS(rest)})) {`);
             continue;
           } else if (keyword === 'else') {
             emit(`} else {`);
@@ -271,41 +251,34 @@ export default function CourseDetail() {
           }
         }
 
-        // 普通语句
-        // print(...)
         const printMatch = content.match(/^print\s*\((.*)\)\s*$/);
         if (printMatch) {
           emit(`print(${pyExprToJS(printMatch[1])});`);
           continue;
         }
-        // 赋值 a = expr
         const assignMatch = content.match(/^(\w+(?:\s*,\s*\w+)*)\s*=\s*(.+)$/);
         if (assignMatch) {
           const lhs = assignMatch[1];
           const rhs = pyExprToJS(assignMatch[2]);
-          // 首声明用 var（同名再赋值会覆盖）
           emit(`var ${lhs} = ${rhs};`);
           continue;
         }
-        // 表达式语句
         emit(pyExprToJS(content) + ';');
       }
 
-      // 关闭剩余块
       while (openBlocks.length > 1) {
         openBlocks.pop();
         emit('}');
       }
 
-      // 组合
-      const fullCode = helpers + jsCode + '\nreturn __out.join("\\n");';
+      const fullCode = helpers + jsCode + '\nreturn __out.join("\\n") + "\\n\\n[系统提示] 内置解释器共执行 " + __loop_count + " 步循环/判断";';
 
       // eslint-disable-next-line no-new-func
       const fn = new Function(fullCode);
       const result = fn();
       return result || '(代码运行成功，没有输出内容)';
     } catch (err: any) {
-      return `⚠️ 内置解释器执行失败：\n${err?.message || err}\n\n建议：切换到 Pyodide 模式（点击▶ 运行代码），或检查语法（注意 Python 缩进是 4 个空格）。`;
+      return `⚠️ 内置解释器执行失败：\n${err?.message || err}\n\n提示：检查Python缩进(4空格)、循环边界；或在本地Python环境运行。`;
     }
   };
 
@@ -526,40 +499,40 @@ export default function CourseDetail() {
     }
 
     setRunningExercise(exerciseId);
-    setExerciseOutput(prev => ({ ...prev, [exerciseId]: '⏳ 正在加载 Python 解释器...（首次需要10-20秒）\n' }));
+    setExerciseOutput(prev => ({ ...prev, [exerciseId]: '⏳ 正在加载 Python 解释器...（首次需要10-20秒，最长执行10秒）\n' }));
 
     // 将用户代码编码为 base64，避免字符串嵌入问题
     let codeB64 = '';
     try {
       codeB64 = btoa(unescape(encodeURIComponent(code)));
     } catch {
-      // UTF-8 安全版
       codeB64 = btoa(code);
     }
 
-    // ============ 策略 1：Pyodide（首选） ============
+    // ============ 策略 1：Pyodide（首选，带步数/超时限制） ============
     try {
       const pyodide = await loadPyodide();
 
-      // 用 base64 传递用户代码，避免三重引号和特殊字符问题
-      // 思路：import base64 -> exec(base64.b64decode(b64).decode())
-      // 同时用 sys.stdout = io.StringIO() 捕获输出
+      // 关键改进：通过 sys.settrace + time.time() 在 Python 层面限制步数与时间
+      // 默认最多执行 50000 条字节码 / 最长 10 秒，避免卡死浏览器
       const runScript = `
-import sys, io, base64
+import sys, io, base64, time
 
 __code_b64 = "${codeB64}"
+__max_steps = 50000
+__max_time = 10.0  # 秒
+__step_count = 0
+__start_time = time.time()
 
 # 捕获 stdout
 __old = sys.stdout
 __buf = io.StringIO()
 sys.stdout = __buf
 
-# 用自定义的 input() 替换（返回空串以避免阻塞）
+# 安全 input()：不阻塞，直接返回空串
 def __safe_input(prompt=''):
     if prompt:
-        sys.stdout = __old
         print(prompt, end='', flush=True)
-        sys.stdout = __buf
     return ''
 
 try:
@@ -568,18 +541,39 @@ try:
 except:
     pass
 
+# 用 trace 函数监控步数与执行时间，超时就抛异常
+def __trace(frame, event, arg):
+    global __step_count
+    __step_count += 1
+    if __step_count > __max_steps:
+        sys.stdout = __old
+        raise RuntimeError("⚠️ 代码执行步数超过限制 (50000步)，可能存在死循环。程序已自动中断。")
+    if time.time() - __start_time > __max_time:
+        sys.stdout = __old
+        raise RuntimeError("⚠️ 代码执行时间超过 10 秒，已自动中断。")
+    return __trace
+
+sys.settrace(__trace)
+
 # 执行用户代码
 try:
-    exec(base64.b64decode(__code_b64).decode('utf-8'))
+    exec(base64.b64decode(__code_b64).decode('utf-8'), {
+        '__builtins__': __builtins__ if '__builtins__' in dir() else builtins,
+        'print': print,
+        'input': __safe_input
+    })
 except Exception as __e:
     import traceback
     traceback.print_exc()
 finally:
+    sys.settrace(None)
     sys.stdout = __old
 
 __txt = __buf.getvalue()
 if not __txt.strip():
-    __txt = '(代码运行成功，没有输出内容)'
+    __txt = '(代码运行成功，没有输出内容)\\n共执行 ' + str(__step_count) + ' 步，用时 ' + str(round(time.time() - __start_time, 3)) + ' 秒'
+else:
+    __txt = __txt + '\\n\\n[系统提示] 共执行 ' + str(__step_count) + ' 步，用时 ' + str(round(time.time() - __start_time, 3)) + ' 秒'
 __txt
 `;
 
@@ -590,7 +584,14 @@ __txt
           pyodide.setStdout({ batched: (s: string) => { fallbackOutput += s; } });
         } catch (e) {}
 
-        const result: string = await pyodide.runPythonAsync(runScript);
+        // 给 pyodide 加一个 Promise 超时：JS 层面也监控 15 秒
+        const timeoutMs = 15000;
+        const runPromise = pyodide.runPythonAsync(runScript);
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('⚠️ JS层超时(15秒)，执行被强制中断。可能存在死循环或复杂计算。')), timeoutMs);
+        });
+
+        const result: string = await Promise.race([runPromise, timeoutPromise]) as string;
         const finalOutput = result || fallbackOutput || '(代码运行成功，没有输出内容)';
         setExerciseOutput(prev => ({ ...prev, [exerciseId]: finalOutput }));
         setRunningExercise(null);
@@ -605,7 +606,7 @@ __txt
       // 继续尝试内置解释器
     }
 
-    // ============ 策略 2：内置 JS 简易 Python 解释器（备用） ============
+    // ============ 策略 2：内置 JS 简易 Python 解释器（备用，带循环保护） ============
     try {
       const result = runPythonJS(code);
       setExerciseOutput(prev => ({
